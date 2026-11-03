@@ -145,6 +145,12 @@
   .ipd-barra-val.up{ color:var(--teal); }
   .ipd-barra-val.warn{ color:var(--amber); }
   .ipd-barra-val.down{ color:var(--red); }
+  .meteo-tag{ font-size:11.5px; color:var(--text-dim); margin-top:6px; font-family:'JetBrains Mono',monospace; }
+  .calor-banda{ display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12px; }
+  .calor-banda .lbl{ width:78px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; }
+  .calor-banda .barra{ flex:1; height:14px; background:var(--surface); border-radius:7px; overflow:hidden; }
+  .calor-banda .barra > div{ height:100%; border-radius:7px; }
+  .calor-banda .val{ width:86px; text-align:right; font-family:'JetBrains Mono',monospace; }
   .aclimatacion-comparativa{ display:flex; gap:10px; align-items:center; }
   .aclimatacion-comparativa > div{ flex:1; background:var(--surface); border-radius:10px; padding:10px; text-align:center; }
   .aclimatacion-comparativa .etiqueta{ font-size:10.5px; color:var(--text-dim); text-transform:uppercase; }
@@ -598,6 +604,8 @@
       <div id="vamWidget"></div>
       <div id="balanceAerobicoWidget"></div>
       <div id="aclimatacionWidget"></div>
+      <div id="respuestaCalorWidget"></div>
+      <div id="pruebaFijaWidget"></div>
     </div>
 
     <div class="tab-panel" id="panel-debrief">
@@ -760,6 +768,12 @@
         <div id="backupStatus" class="status"></div>
         <p class="hint" id="almacenamientoEstado" style="margin-top:8px;"></p>
         <button class="primary-btn" id="instalarAppBtn" style="display:none; margin-top:8px;">📲 Instalar Wattly en el móvil</button>
+      </div>
+      <div class="card">
+        <h3>🌦️ Tiempo real de las sesiones</h3>
+        <p class="hint" style="margin-bottom:10px;">Las sesiones nuevas con GPS lo traen solas al importarlas. Este botón rellena las antiguas: temperatura, humedad, sensación térmica y viento de Open-Meteo. Solo se envía la fecha y una ubicación aproximada (~1 km).</p>
+        <button class="primary-btn" id="completarMeteoBtn">Completar tiempo</button>
+        <div id="completarMeteoStatus" class="status"></div>
       </div>
       <div class="card" style="text-align:center;">
         <h3 style="text-align:center;">Wattly</h3>
@@ -1482,14 +1496,29 @@ function buildSesionFromFit(messages) {
   // mostrarlo en la UI (badge "🏠 Interior") en vez de un mapa vacío sin
   // explicación, y para poder excluir estas sesiones de análisis que sí
   // necesiten GPS de verdad (desnivel, terreno) el día que los haya.
-  const esInterior = track.length > 0 && track.every(p => p.lat == null);
+  // Plataformas virtuales (Rouvy y similares): el .fit trae coordenadas,
+  // velocidad, distancia y desnivel de la RUTA VIRTUAL (p. ej. Ljubljana),
+  // no de un sitio real. Se quitan del track para que nada que dependa del
+  // GPS (mapa, tiempo de Open-Meteo, viento, tramos, velocidad) las trate
+  // como una salida de verdad. Potencia, FC y cadencia sí son reales.
+  // El balance izq/dcha de Rouvy viene fijo al 50%: no se usa.
+  const fileId = (messages.fileIdMesgs || [])[0] || {};
+  const esVirtual = session.subSport === 'virtualActivity' ||
+    fileId.manufacturer === 'virtualtraining' ||
+    /rouvy/i.test(fileId.productName || '');
+  if (esVirtual) {
+    for (const p of track) { p.lat = null; p.lon = null; p.alt = null; p.spd = null; }
+  }
+
+  const esInterior = esVirtual || (track.length > 0 && track.every(p => p.lat == null));
 
   const sesionMeta = {
     id,
     fecha: fechaLocalStr(now),
     hora: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
     tipo: session.sport || 'desconocido',
-    origen: 'suunto_fit',
+    origen: esVirtual ? (/rouvy/i.test(fileId.productName || '') || fileId.manufacturer === 'virtualtraining' ? 'rouvy' : 'virtual') : 'suunto_fit',
+    es_virtual: esVirtual,
     tramo_id: null,
     es_interior: esInterior,
     sensor_potencia_ausente: sensorPotenciaAusente,
@@ -1532,7 +1561,27 @@ function buildSesionFromFit(messages) {
     }
   };
 
+  // Distancia y desnivel de la ruta virtual SÍ cuentan en las estadísticas
+  // (decisión de Javi): se quedan en distancia_km / ascenso_m como cualquier sesión.
+
   return { sesionMeta, track };
+}
+
+// Nombre de la ruta virtual a partir del nombre del fichero de Rouvy
+// ("ROUVY_Tour_of_Slovenia_Ljubljana_Semana_12_.fit" → "Tour of Slovenia Ljubljana Semana 12")
+function nombreRutaVirtualDeFichero(nombre) {
+  if (!nombre) return null;
+  const limpio = nombre.replace(/\.fit$/i, '').replace(/^rouvy[_\s-]*/i, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  return limpio || null;
+}
+
+// Posible duplicado: ya hay una sesión de la misma disciplina que empieza a menos de 15 min
+const DUPLICADO_MARGEN_MIN = 15;
+function buscarPosibleDuplicado(sesionNueva, sesiones) {
+  const tNueva = new Date(`${sesionNueva.fecha}T${sesionNueva.hora}`).getTime();
+  return sesiones.find(s => s.id !== sesionNueva.id &&
+    categoriaDisciplina(s.tipo) === categoriaDisciplina(sesionNueva.tipo) &&
+    Math.abs(new Date(`${s.fecha}T${s.hora}`).getTime() - tNueva) <= DUPLICADO_MARGEN_MIN * 60000) || null;
 }
 
 // ---------- Importación de sesión SOLO desde JSON (sin .fit) ----------
@@ -2801,7 +2850,212 @@ const DESACOPLE_MIN_PUNTOS_POR_MITAD = 30;
 // el termómetro — esto es una guía orientativa, no una medición WBGT real.
 const UMBRAL_CALOR_MODERADO = 24; // °C
 const UMBRAL_CALOR_ALTO = 28;     // °C
+// Desde que cada sesión trae el tiempo real de Open-Meteo, los umbrales se
+// aplican a la SENSACIÓN TÉRMICA (temperatura + humedad + viento), que se
+// acerca más a lo que mide el WBGT que el termómetro seco. Si una sesión no
+// tiene dato de Open-Meteo, se usa la temperatura del reloj como respaldo
+// (sesgada al alza por el calor de la muñeca) y la UI lo indica.
+
+// ---------- Tiempo real (Open-Meteo) ----------
+// Gratis, sin API key, CORS abierto. Solo se envía fecha + ubicación
+// redondeada a 2 decimales (~1 km). El viento es a 10 m de altura: más fuerte
+// que el que nota un ciclista, así que se usa para COMPARAR sesiones, no como
+// cifra absoluta. Resolución espacial de varios km y horaria.
+const METEO_VARIABLES = 'temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m';
+const METEO_DIAS_FORECAST = 80;      // más reciente que esto → API de previsión (el archivo histórico va con ~5 días de retraso)
+const VIENTO_UMBRAL_KMH = 2;          // componente de viento por debajo de esto = lateral/calma
+const VIENTO_DIFF_COMPARABLE_KMH = 5; // diferencia de viento neto a partir de la cual dos salidas en bici no son comparables
+
+function tempCalorDe(s) {
+  if (s && s.meteo && s.meteo.sensacion_c != null) return { valor: s.meteo.sensacion_c, fuente: 'sensación térmica', real: true };
+  const t = s?.datos_suunto?.temperatura_media;
+  if (t != null) return { valor: t, fuente: 'reloj', real: false };
+  return null;
+}
+function tempCalor(s) { const t = tempCalorDe(s); return t ? t.valor : null; }
+
+function _puntoCentralConGps(points) {
+  const conGps = (points || []).filter(p => p.lat != null && p.lon != null && p.t != null);
+  if (!conGps.length) return null;
+  return conGps[Math.floor(conGps.length / 2)];
+}
+
+function _fechaUtcStr(ms) { return new Date(ms).toISOString().slice(0, 10); }
+
+async function pedirMeteoOpenMeteo(lat, lon, tInicio, tFin) {
+  const diasAtras = (Date.now() - tInicio) / 86400000;
+  const base = diasAtras > METEO_DIAS_FORECAST
+    ? 'https://archive-api.open-meteo.com/v1/archive'
+    : 'https://api.open-meteo.com/v1/forecast';
+  const url = `${base}?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}` +
+    `&hourly=${METEO_VARIABLES}&start_date=${_fechaUtcStr(tInicio)}&end_date=${_fechaUtcStr(tFin)}` +
+    `&timezone=GMT&wind_speed_unit=kmh`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error('Open-Meteo respondió ' + resp.status);
+  const j = await resp.json();
+  const h = j && j.hourly;
+  if (!h || !Array.isArray(h.time)) throw new Error('Respuesta de Open-Meteo sin datos horarios');
+  return h.time.map((tt, i) => ({
+    t: Date.parse(tt + ':00Z'),
+    temp: h.temperature_2m?.[i], hum: h.relative_humidity_2m?.[i], sens: h.apparent_temperature?.[i],
+    ws: h.wind_speed_10m?.[i], wd: h.wind_direction_10m?.[i], gust: h.wind_gusts_10m?.[i]
+  }));
+}
+
+// Media de las horas que tocan la sesión (de la hora en punto anterior al inicio a la posterior al final)
+function resumirMeteo(horas, tInicio, tFin) {
+  const H = 3600000;
+  const desde = Math.floor(tInicio / H) * H, hasta = Math.ceil(tFin / H) * H;
+  const dentro = horas.filter(x => x.t >= desde && x.t <= hasta && x.temp != null);
+  if (!dentro.length) return null;
+  const media = k => { const v = dentro.map(x => x[k]).filter(v => v != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  // dirección media vectorial (la media aritmética de ángulos falla cerca de 0/360)
+  let sx = 0, sy = 0;
+  for (const x of dentro) if (x.wd != null && x.ws != null) { sx += x.ws * Math.sin(x.wd * Math.PI / 180); sy += x.ws * Math.cos(x.wd * Math.PI / 180); }
+  const dir = (Math.atan2(sx, sy) * 180 / Math.PI + 360) % 360;
+  const r1 = v => v == null ? null : Math.round(v * 10) / 10;
+  return {
+    temp_c: r1(media('temp')), humedad_pct: media('hum') == null ? null : Math.round(media('hum')),
+    sensacion_c: r1(media('sens')), viento_kmh: r1(media('ws')), rachas_kmh: r1(Math.max(...dentro.map(x => x.gust ?? 0))),
+    viento_dir: Math.round(dir)
+  };
+}
+
+function _rumbo(lat1, lon1, lat2, lon2) {
+  const toRad = d => d * Math.PI / 180;
+  const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+// Componente del viento sobre la marcha: + de cara, − a favor. Tramos de ≥25 m
+// para que el ruido del GPS no invente rumbos. Ponderado por tiempo.
+function calcularVientoRelativo(points, horas) {
+  const pts = (points || []).filter(p => p.lat != null && p.lon != null && p.t != null);
+  if (pts.length < 10 || !horas || !horas.length) return null;
+  const horaMasCercana = t => horas.reduce((m, x) => Math.abs(x.t - t) < Math.abs(m.t - t) ? x : m);
+  let tCara = 0, tFavor = 0, tTotal = 0, sumaComp = 0;
+  let ancla = pts[0];
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i];
+    const d = haversine(ancla.lat, ancla.lon, p.lat, p.lon);
+    if (d < 25) continue;
+    const dt = (p.t - ancla.t) / 1000;
+    if (dt <= 0 || dt > 300) { ancla = p; continue; } // pausas largas: no cuentan
+    const h = horaMasCercana((p.t + ancla.t) / 2);
+    if (h.ws == null || h.wd == null) { ancla = p; continue; }
+    const rumbo = _rumbo(ancla.lat, ancla.lon, p.lat, p.lon);
+    const comp = h.ws * Math.cos((h.wd - rumbo) * Math.PI / 180); // wd = de dónde viene; rumbo hacia allí = de cara
+    tTotal += dt; sumaComp += comp * dt;
+    if (comp > VIENTO_UMBRAL_KMH) tCara += dt; else if (comp < -VIENTO_UMBRAL_KMH) tFavor += dt;
+    ancla = p;
+  }
+  if (tTotal < 600) return null; // menos de 10 min de movimiento útil
+  return {
+    pct_cara: Math.round(tCara / tTotal * 100),
+    pct_favor: Math.round(tFavor / tTotal * 100),
+    neto_kmh: Math.round(sumaComp / tTotal * 10) / 10
+  };
+}
+
+// Busca el tiempo de una sesión y lo guarda en sesion.meteo. Devuelve el meteo o null.
+async function completarMeteoSesion(sesion, points) {
+  if (!sesion || sesion.es_interior) return null;
+  const pc = _puntoCentralConGps(points);
+  if (!pc) return null;
+  const tiempos = points.filter(p => p.t != null).map(p => p.t);
+  const tInicio = Math.min(...tiempos), tFin = Math.max(...tiempos);
+  const horas = await pedirMeteoOpenMeteo(pc.lat, pc.lon, tInicio, tFin);
+  const resumen = resumirMeteo(horas, tInicio, tFin);
+  if (!resumen) return null;
+  const meteo = { ...resumen, fuente: 'open-meteo', obtenido: fechaLocalStr(new Date()) };
+  if (categoriaDisciplina(sesion.tipo) === 'cycling') {
+    const v = calcularVientoRelativo(points, horas);
+    if (v) meteo.viento_rel = v;
+  }
+  actualizarSesion(sesion.id, { meteo });
+  return meteo;
+}
+
+const PUNTOS_CARDINALES = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+function cardinalDe(grados) { return PUNTOS_CARDINALES[Math.round(((grados % 360) + 360) % 360 / 45) % 8]; }
+
+function lineaMeteoHtml(s) {
+  const m = s.meteo;
+  if (!m) return '';
+  const partes = [];
+  if (m.temp_c != null) partes.push(`🌡 ${Math.round(m.temp_c)}°${m.sensacion_c != null && Math.abs(m.sensacion_c - m.temp_c) >= 2 ? ` (sens. ${Math.round(m.sensacion_c)}°)` : ''}`);
+  if (m.humedad_pct != null) partes.push(`💧 ${m.humedad_pct}%`);
+  if (m.viento_kmh != null) partes.push(`💨 ${Math.round(m.viento_kmh)} km/h ${cardinalDe(m.viento_dir)}`);
+  return partes.length ? `<div class="meteo-tag" title="Tiempo real de Open-Meteo en la zona y hora de la sesión (resolución de varios km, horaria)">${partes.join(' · ')}</div>` : '';
+}
+
+function detalleVientoHtml(s) {
+  const v = s.meteo && s.meteo.viento_rel;
+  if (!v) return '';
+  const neto = v.neto_kmh > 0 ? `+${v.neto_kmh} km/h de cara` : v.neto_kmh < 0 ? `${Math.abs(v.neto_kmh)} km/h a favor` : 'neutro';
+  return `<p class="hint" style="margin-top:6px;">💨 Viento sobre tu marcha: <b>${v.pct_cara}%</b> del tiempo de cara, <b>${v.pct_favor}%</b> a favor · neto ${neto}. <span style="opacity:.75">(Viento a 10 m de altura de Open-Meteo: sirve para comparar salidas, no como cifra exacta.)</span></p>`;
+}
 const ACLIMATACION_MIN_SESIONES_CALOR = 6; // mínimo de sesiones calientes con desacople calculable para comparar "antes" vs "ahora"
+
+// ---------- Prueba fija mensual (rodillo, ERG a vatios fijos) ----------
+// Siempre los MISMOS vatios (no un % del FTP): si cambiaran con el FTP, ya
+// no compararíamos lo mismo. Se detecta sola: el tramo continuo más largo en
+// que la media móvil de 30 s se mantiene en PRUEBA_FIJA_W ±5%, de al menos
+// 18 min, en una sesión de bici de interior. Los primeros 5 min del bloque
+// no cuentan para la FC (todavía está subiendo).
+const PRUEBA_FIJA_W = 150;
+const PRUEBA_FIJA_MARGEN = 0.05;
+const PRUEBA_FIJA_MIN_SEG = 18 * 60;
+const PRUEBA_FIJA_DESCARTE_SEG = 5 * 60;
+const PRUEBA_FIJA_VENTANA_SEG = 30;
+const PRUEBA_FIJA_CADENCIA_DIFF = 5; // rpm: más diferencia que esto con la prueba de referencia = aviso
+
+function detectarPruebaFija(points) {
+  const pts = (points || []).filter(p => p.t != null && p.pw != null);
+  if (pts.length < 60) return null;
+  const lo = PRUEBA_FIJA_W * (1 - PRUEBA_FIJA_MARGEN), hi = PRUEBA_FIJA_W * (1 + PRUEBA_FIJA_MARGEN);
+  // media móvil de 30 s (ventana hacia atrás) por punto
+  const media30 = new Array(pts.length);
+  let ini = 0, suma = 0;
+  for (let i = 0; i < pts.length; i++) {
+    suma += pts[i].pw;
+    while (pts[i].t - pts[ini].t > PRUEBA_FIJA_VENTANA_SEG * 1000) { suma -= pts[ini].pw; ini++; }
+    media30[i] = (pts[i].t - pts[ini].t >= (PRUEBA_FIJA_VENTANA_SEG - 2) * 1000) ? suma / (i - ini + 1) : null;
+  }
+  // tramo continuo más largo dentro del margen (sin huecos de más de 10 s)
+  let mejor = null, desde = null;
+  const cerrar = (hasta) => {
+    if (desde == null) return;
+    const dur = (pts[hasta].t - pts[desde].t) / 1000;
+    if (!mejor || dur > mejor.dur) mejor = { i0: desde, i1: hasta, dur };
+  };
+  for (let i = 0; i < pts.length; i++) {
+    const dentro = media30[i] != null && media30[i] >= lo && media30[i] <= hi && (i === 0 || pts[i].t - pts[i - 1].t <= 10000);
+    if (dentro) { if (desde == null) desde = i; }
+    else { cerrar(i - 1); desde = null; }
+  }
+  cerrar(pts.length - 1);
+  if (!mejor || mejor.dur < PRUEBA_FIJA_MIN_SEG) return null;
+
+  // la ventana de 30 s va hacia atrás: el bloque real empieza ~30 s antes del primer punto "dentro"
+  const tIni = pts[mejor.i0].t - PRUEBA_FIJA_VENTANA_SEG * 1000, tFin = pts[mejor.i1].t;
+  const bloque = pts.filter(p => p.t >= tIni && p.t <= tFin);
+  const util = bloque.filter(p => p.t >= tIni + PRUEBA_FIJA_DESCARTE_SEG * 1000 && p.hr != null && p.hr > 0);
+  if (util.length < 60) return null;
+  const media = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+  const tMitad = util[0].t + (util[util.length - 1].t - util[0].t) / 2;
+  const h1 = util.filter(p => p.t <= tMitad).map(p => p.hr), h2 = util.filter(p => p.t > tMitad).map(p => p.hr);
+  const cads = bloque.map(p => p.cad).filter(c => c != null && c > 0);
+  return {
+    vatios_objetivo: PRUEBA_FIJA_W,
+    duracion_min: Math.round((tFin - tIni) / 60000),
+    potencia_media: Math.round(media(bloque.map(p => p.pw))),
+    fc_media: Math.round(media(util.map(p => p.hr)) * 10) / 10,
+    deriva_ppm: (h1.length && h2.length) ? Math.round((media(h2) - media(h1)) * 10) / 10 : null,
+    cadencia_media: cads.length ? Math.round(media(cads)) : null
+  };
+}
 
 function calcularDesacopleCardiaco(track) {
   if (!track || track.length < 2) {
@@ -2980,7 +3234,7 @@ function calcularRupturaForma(track, opts = {}) {
 // mejora en puntos porcentuales de desacople.
 async function calcularAclimatacionCalor(sesiones) {
   const candidatas = sesiones
-    .filter(s => categoriaDisciplina(s.tipo) === 'running' && s.tiene_track && s.datos_suunto.temperatura_media != null && s.datos_suunto.temperatura_media >= UMBRAL_CALOR_MODERADO)
+    .filter(s => categoriaDisciplina(s.tipo) === 'running' && s.tiene_track && tempCalor(s) != null && tempCalor(s) >= UMBRAL_CALOR_MODERADO)
     .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
 
   if (!candidatas.length) {
@@ -2992,7 +3246,7 @@ async function calcularAclimatacionCalor(sesiones) {
     try {
       const trackData = await getTrack(s.id);
       const d = calcularDesacopleCardiaco(trackData?.points);
-      if (d.disponible) conDesacople.push({ fecha: s.fecha, temperatura: s.datos_suunto.temperatura_media, desacople: d.desacople_pct });
+      if (d.disponible) conDesacople.push({ fecha: s.fecha, temperatura: tempCalor(s), desacople: d.desacople_pct });
     } catch (err) {
       console.error('Error leyendo track para aclimatación:', s.id, err);
     }
@@ -3983,7 +4237,7 @@ const ESPEJO_BASELINE_EXCLUIR_MIN = 5;  // minutos iniciales de cada sesión exc
 function calcularSesionesSimilares(sesiones, sesionRef, disciplina) {
   const limiteFecha = new Date(Date.now() - ESPEJO_VENTANA_MESES * 30.44 * 86400000);
   const duracionRef = sesionRef.datos_suunto.duracion_min;
-  const tempRef = sesionRef.datos_suunto.temperatura_media;
+  const tempRef = tempCalor(sesionRef);
   if (!duracionRef) return [];
 
   let intensidadRef, margenIntensidad, obtenerIntensidad;
@@ -4006,7 +4260,7 @@ function calcularSesionesSimilares(sesiones, sesionRef, disciplina) {
     if (!dur || Math.abs(dur - duracionRef) / duracionRef > ESPEJO_DURACION_MARGEN) return false;
     const intensidad = obtenerIntensidad(s);
     if (!intensidad || Math.abs(intensidad - intensidadRef) / intensidadRef > margenIntensidad) return false;
-    const temp = s.datos_suunto.temperatura_media;
+    const temp = tempCalor(s);
     if (tempRef != null && temp != null && Math.abs(temp - tempRef) > ESPEJO_TEMP_MAX_DIFF) return false;
     return true;
   });
@@ -4822,7 +5076,10 @@ async function compararSesiones(idA, idB) {
     { etiqueta: 'Tiempo de contacto', a: sA.datos_suunto.tiempo_contacto_ms != null ? sA.datos_suunto.tiempo_contacto_ms + ' ms' : '—', b: sB.datos_suunto.tiempo_contacto_ms != null ? sB.datos_suunto.tiempo_contacto_ms + ' ms' : '—' },
     { etiqueta: 'Asimetría de apoyo', a: asimetriaTxt(sA), b: asimetriaTxt(sB) },
     { etiqueta: 'Desacople cardíaco', a: desacopleA != null ? desacopleA + '%' : '—', b: desacopleB != null ? desacopleB + '%' : '—' },
-    { etiqueta: 'Temperatura', a: sA.datos_suunto.temperatura_media != null ? sA.datos_suunto.temperatura_media + '°C' : '—', b: sB.datos_suunto.temperatura_media != null ? sB.datos_suunto.temperatura_media + '°C' : '—' },
+    { etiqueta: 'Temperatura', a: sA.meteo?.temp_c != null ? sA.meteo.temp_c + '°C' : (sA.datos_suunto.temperatura_media != null ? sA.datos_suunto.temperatura_media + '°C (reloj)' : '—'), b: sB.meteo?.temp_c != null ? sB.meteo.temp_c + '°C' : (sB.datos_suunto.temperatura_media != null ? sB.datos_suunto.temperatura_media + '°C (reloj)' : '—') },
+    { etiqueta: 'Sensación térmica', a: sA.meteo?.sensacion_c != null ? sA.meteo.sensacion_c + '°C' : '—', b: sB.meteo?.sensacion_c != null ? sB.meteo.sensacion_c + '°C' : '—' },
+    { etiqueta: 'Humedad', a: sA.meteo?.humedad_pct != null ? sA.meteo.humedad_pct + '%' : '—', b: sB.meteo?.humedad_pct != null ? sB.meteo.humedad_pct + '%' : '—' },
+    { etiqueta: 'Viento neto (bici)', a: sA.meteo?.viento_rel ? (sA.meteo.viento_rel.neto_kmh > 0 ? '+' : '') + sA.meteo.viento_rel.neto_kmh + ' km/h' : '—', b: sB.meteo?.viento_rel ? (sB.meteo.viento_rel.neto_kmh > 0 ? '+' : '') + sB.meteo.viento_rel.neto_kmh + ' km/h' : '—' },
     { etiqueta: '🦵 Dolor de rodilla', a: sA.rodilla.dolor_0_10 ?? '—', b: sB.rodilla.dolor_0_10 ?? '—', destacada: true }
   ];
 
@@ -8022,14 +8279,14 @@ function corrAsimetriaDolor(sesionesOrd) {
 // no se fuerza una relación causal que no está bien establecida.
 function corrTemperaturaDolor(sesionesOrd) {
   const valores = sesionesOrd
-    .filter(s => categoriaDisciplina(s.tipo) === 'running' && s.datos_suunto.temperatura_media != null)
-    .map(s => s.datos_suunto.temperatura_media);
+    .filter(s => categoriaDisciplina(s.tipo) === 'running' && tempCalor(s) != null)
+    .map(s => tempCalor(s));
   const mediana = medianaDe(valores);
   if (mediana == null) return null;
   const mejor = mejorLagParaVariable(
     sesionesOrd,
-    s => categoriaDisciplina(s.tipo) === 'running' && s.datos_suunto.temperatura_media != null,
-    s => s.datos_suunto.temperatura_media > mediana,
+    s => categoriaDisciplina(s.tipo) === 'running' && tempCalor(s) != null,
+    s => tempCalor(s) > mediana,
     UMBRAL_DOLOR_MIN
   );
   if (!mejor) return null;
@@ -8548,17 +8805,24 @@ function _textoResumenBackup(r) {
   return partes.join(', ');
 }
 
-async function procesarFitFile(arrayBuffer) {
+async function procesarFitFile(arrayBuffer, nombreFichero) {
   const buf = new Uint8Array(arrayBuffer);
   const stream = FitSDK.Stream.fromByteArray(buf);
   const decoder = new FitSDK.Decoder(stream);
   const { messages } = decoder.read();
   const { sesionMeta, track } = buildSesionFromFit(messages);
+  if (sesionMeta.es_virtual) sesionMeta.ruta_virtual = nombreRutaVirtualDeFichero(nombreFichero);
 
+  const posibleDuplicado = buscarPosibleDuplicado(sesionMeta, loadSesionesMeta());
+  if (sesionMeta.es_interior && categoriaDisciplina(sesionMeta.tipo) === 'cycling') {
+    const pf = detectarPruebaFija(track);
+    if (pf) sesionMeta.prueba_fija = pf;
+  }
   await addSesion(sesionMeta, track);
 
-  if (!track.length) {
-    return { sesionMeta, track, tramoDetectado: null, tramoNuevo: false };
+  // Sin track o de interior (rodillo, cinta, Rouvy): no hay recorrido real que reconocer ni guardar
+  if (!track.length || sesionMeta.es_interior) {
+    return { sesionMeta, track, tramoDetectado: null, tramoNuevo: false, posibleDuplicado };
   }
 
   const tramos = loadTramos();
@@ -8566,9 +8830,9 @@ async function procesarFitFile(arrayBuffer) {
   if (match) {
     actualizarSesion(sesionMeta.id, { tramo_id: match.id });
     sesionMeta.tramo_id = match.id;
-    return { sesionMeta, track, tramoDetectado: match, tramoNuevo: false };
+    return { sesionMeta, track, tramoDetectado: match, tramoNuevo: false, posibleDuplicado };
   }
-  return { sesionMeta, track, tramoDetectado: null, tramoNuevo: true };
+  return { sesionMeta, track, tramoDetectado: null, tramoNuevo: true, posibleDuplicado };
 }
 </script>
   <script>// ============================================================
@@ -8947,8 +9211,14 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
   const reader = new FileReader();
   reader.onload = async function () {
     try {
-      const resultado = await procesarFitFile(this.result);
-      const { sesionMeta, track, tramoDetectado, tramoNuevo } = resultado;
+      const resultado = await procesarFitFile(this.result, file.name);
+      const { sesionMeta, track, tramoDetectado, tramoNuevo, posibleDuplicado } = resultado;
+      // Tiempo real en segundo plano: si no hay conexión no pasa nada, se puede completar luego desde Ajustes
+      if (track.length && !sesionMeta.es_interior) {
+        completarMeteoSesion(sesionMeta, track)
+          .then(m => { if (m) renderSesiones(); })
+          .catch(err => console.warn('Sin tiempo de Open-Meteo para esta sesión:', err.message));
+      }
 
       if (tramoDetectado) {
         statusEl.textContent = `Guardada · ${nombreTipo(sesionMeta.tipo)} · Tramo reconocido: "${tramoDetectado.nombre}"`;
@@ -8965,10 +9235,14 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
         document.getElementById('nameModal').style.display = 'flex';
         renderSesiones(); renderTramos(); renderForma(); renderEstadisticas(); renderZapatillas(); renderHeaderRio();
       } else {
-        statusEl.textContent = `Guardada · ${nombreTipo(sesionMeta.tipo)}${track.length ? '' : ' (sin GPS)'}`;
+        statusEl.textContent = `Guardada · ${nombreTipo(sesionMeta.tipo)}${sesionMeta.es_virtual ? ' · 🏠 Rouvy' + (sesionMeta.ruta_virtual ? ` (${sesionMeta.ruta_virtual})` : '') : sesionMeta.es_interior ? ' · 🏠 Interior' : track.length ? '' : ' (sin GPS)'}`;
         statusEl.className = 'status ok';
         renderSesiones(); renderTramos(); renderForma(); renderEstadisticas(); renderZapatillas(); renderHeaderRio();
         abrirRegistroModal(sesionMeta.id);
+      }
+      if (posibleDuplicado) {
+        statusEl.textContent += ` · ⚠️ Ojo: ya tenías una sesión de ${nombreTipo(posibleDuplicado.tipo)} el ${posibleDuplicado.fecha} a las ${posibleDuplicado.hora}. Si es la misma, borra una para no contar la carga dos veces.`;
+        statusEl.className = 'status err';
       }
 
     } catch (err) {
@@ -9330,7 +9604,8 @@ function renderSesiones() {
           ${epocAlto ? `<span class="sensor-warn-tag" title="EPOC ${s.datos_suunto.epoc} — al menos ${EPOC_UMBRAL_MULTIPLICADOR}x tu media reciente (${Math.round(epocMediaGlobal)}, últimos ${VENTANA_ESTIMACION_DIAS} días o todo tu histórico si no hay suficientes). Esfuerzo metabólicamente muy exigente.">🔥 EPOC alto</span>` : ''}
           ${s.sensor_potencia_ausente ? `<span class="sensor-warn-tag" title="Ningún registro trajo potencia > 0 — probablemente el potenciómetro no estaba emparejado esta sesión">⚠️ Sin potencia</span>` : ''}
           ${!s.sensor_potencia_ausente && s.sensor_cadencia_ausente ? `<span class="sensor-warn-tag" title="Ningún registro trajo cadencia > 0 — probablemente el sensor de cadencia no estaba emparejado esta sesión">⚠️ Sin cadencia</span>` : ''}
-          ${s.es_interior ? `<span class="sensor-warn-tag" title="Sin coordenadas GPS — sesión de interior (rodillo/cinta). Potencia/FC/cadencia se usan igual en curva de potencia, durability y espejo.">🏠 Interior</span>` : ''}
+          ${s.es_virtual ? `<span class="sensor-warn-tag" title="Sesión de Rouvy en rodillo: la ruta es virtual (sin mapa, sin tiempo, sin tramos). Distancia, desnivel, potencia, FC y cadencia cuentan en tus estadísticas.">🏠 Rouvy</span>` : ''}
+          ${s.es_interior && !s.es_virtual ? `<span class="sensor-warn-tag" title="Sin coordenadas GPS — sesión de interior (rodillo/cinta). Potencia/FC/cadencia se usan igual en curva de potencia, durability y espejo.">🏠 Interior</span>` : ''}
         </div>
         <div style="display:flex; gap:6px;">
           ${categoriaDisciplina(s.tipo) === 'running' ? `<button class="del-btn balance-btn" data-id="${s.id}" title="Importar balance de apoyo desde JSON de Suunto">⚖️</button>` : ''}
@@ -9352,6 +9627,9 @@ function renderSesiones() {
           ? `<span>Vel <b>${(calcularVelocidadMediaKmh(s.datos_suunto.duracion_min, s.datos_suunto.distancia_km) ?? 0).toFixed(1)} km/h</b></span>`
           : ''}
       </div>
+      ${lineaMeteoHtml(s)}
+      ${s.es_virtual && s.ruta_virtual ? `<div class="tramo-tag">🎮 ${s.ruta_virtual}</div>` : ''}
+      ${s.prueba_fija ? `<div class="tramo-tag">🧪 Prueba fija ${s.prueba_fija.vatios_objetivo} W · FC ${s.prueba_fija.fc_media} · deriva ${s.prueba_fija.deriva_ppm != null ? (s.prueba_fija.deriva_ppm > 0 ? '+' : '') + s.prueba_fija.deriva_ppm : '—'} ppm</div>` : ''}
       ${s.tramo_id ? `<div class="tramo-tag">📍 ${(loadTramos().find(t => t.id === s.tramo_id) || {}).nombre || 'tramo'}</div>` : ''}
       ${tieneRegistro
         ? `<div class="registro-tag">${sensacionIcono} ${rm.zona_trabajada || ''} ${rm.rpe != null ? '· RPE ' + rm.rpe : ''}${rm.carga_articular ? ' · 🦴 ' + rm.carga_articular : ''}${rod.dolor_0_10 ? ' · 🦵 ' + rod.dolor_0_10 + '/10' : ''}</div>`
@@ -9372,9 +9650,10 @@ function renderSesiones() {
           <div>Cadencia media <b>${s.datos_suunto.cadencia_media ?? '—'}</b></div>
           <div>Calorías <b>${s.datos_suunto.calorias ?? '—'}</b></div>
           <div>Ascenso <b>${s.datos_suunto.ascenso_m != null ? s.datos_suunto.ascenso_m + 'm' : '—'}</b></div>
-          <div>Origen <b>${s.origen === 'suunto_fit' ? 'Suunto (.fit)' : s.origen}</b></div>
-          <div>Track GPS <b>${s.tiene_track ? 'Sí' : 'No'}</b></div>
+          <div>Origen <b>${s.origen === 'suunto_fit' ? 'Suunto (.fit)' : s.origen === 'rouvy' ? 'Rouvy (.fit)' : s.origen}</b></div>
+          <div>Track GPS <b>${s.es_interior ? 'No (interior)' : s.tiene_track ? 'Sí' : 'No'}</b></div>
         </div>
+        ${detalleVientoHtml(s)}
         ${rm.nota_libre ? `<p class="hint" style="margin-top:8px;">📝 ${rm.nota_libre}</p>` : ''}
         ${rod.nota_rodilla ? `<p class="hint" style="margin-top:4px;">🦵 ${rod.nota_rodilla}</p>` : ''}
         ${s.datos_suunto.balance_izq_pct != null ? `<p class="hint" style="margin-top:4px;">⚖️ Balance apoyo: ${s.datos_suunto.balance_izq_pct.toFixed(1)}% / ${s.datos_suunto.balance_dcha_pct.toFixed(1)}%</p>` : ''}
@@ -9400,18 +9679,23 @@ function renderSesiones() {
         const trackData = await getTrack(card.dataset.id);
         const puntos = decimarTrack(trackData?.points, 150);
         const svg = generarMiniMapaSvg(puntos);
-        mapaEl.innerHTML = svg || '<p class="hint">Este track no tiene coordenadas suficientes para dibujarlo.</p>';
+        const sesMapa = loadSesionesMeta().find(x => x.id === card.dataset.id);
+        mapaEl.innerHTML = svg || (sesMapa?.es_interior
+          ? `<p class="hint">🏠 Sesión de interior${sesMapa.es_virtual ? ' (Rouvy: la ruta es virtual, no se dibuja)' : ''} — sin mapa.</p>`
+          : '<p class="hint">Este track no tiene coordenadas suficientes para dibujarlo.</p>');
 
         if (desacopleEl) {
           const sesionActual = loadSesionesMeta().find(x => x.id === card.dataset.id);
           const d = calcularDesacopleCardiaco(trackData?.points);
           if (d.disponible) {
-            const temp = sesionActual?.datos_suunto?.temperatura_media;
+            const tInfo = tempCalorDe(sesionActual);
+            const temp = tInfo ? tInfo.valor : null;
+            const fuenteTxt = tInfo && tInfo.real ? 'de sensación térmica' : 'según el reloj';
             let avisoCalor = '';
             if (temp != null && temp >= UMBRAL_CALOR_ALTO) {
-              avisoCalor = `<p class="hint" style="margin-top:6px;">🌡️ Corriste a ${temp}°C de media — con calor así, parte de este desacople es normal (estrés térmico, no necesariamente pérdida de forma). Tómalo con cautela.</p>`;
+              avisoCalor = `<p class="hint" style="margin-top:6px;">🌡️ Corriste a ${temp}°C ${fuenteTxt} — con calor así, parte de este desacople es normal (estrés térmico, no necesariamente pérdida de forma). Tómalo con cautela.</p>`;
             } else if (temp != null && temp >= UMBRAL_CALOR_MODERADO) {
-              avisoCalor = `<p class="hint" style="margin-top:6px;">🌡️ ${temp}°C de media — algo de calor; puede estar inflando ligeramente este número.</p>`;
+              avisoCalor = `<p class="hint" style="margin-top:6px;">🌡️ ${temp}°C ${fuenteTxt} — algo de calor; puede estar inflando ligeramente este número.</p>`;
             }
             desacopleEl.innerHTML = `<div class="desacople-card ${claseDesacople(d.desacople_pct)}">
                  <span class="desacople-label">⚡ Desacople cardíaco (potencia/FC)</span>
@@ -10985,6 +11269,8 @@ function renderEstadisticas() {
     renderBalanceAerobicoWidget();
     renderVistaUnificadaWidget();
     renderAclimatacionWidget();
+    renderRespuestaCalorWidget();
+    renderPruebaFijaWidget();
     return;
   }
 
@@ -11098,6 +11384,8 @@ function renderEstadisticas() {
   renderBalanceAerobicoWidget();
   renderVistaUnificadaWidget();
   renderAclimatacionWidget();
+  renderRespuestaCalorWidget();
+  renderPruebaFijaWidget();
 }
 
 function renderVistaUnificadaWidget() {
@@ -11720,6 +12008,168 @@ function renderEspejoBoton(el, sessionId) {
 }
 
 // ---------- Aclimatación al calor: UI ----------
+// ---------- Prueba fija mensual: evolución ----------
+async function recalcularPruebasFijas() {
+  const sesiones = loadSesionesMeta().filter(s => s.tiene_track && s.es_interior && categoriaDisciplina(s.tipo) === 'cycling');
+  for (const s of sesiones) {
+    try {
+      const tr = await getTrack(s.id);
+      const pf = detectarPruebaFija(tr?.points);
+      if (pf) actualizarSesion(s.id, { prueba_fija: pf });
+      else if (s.prueba_fija) actualizarSesion(s.id, { prueba_fija: null });
+    } catch (err) { console.error('Prueba fija:', s.id, err); }
+  }
+  return loadSesionesMeta()
+    .filter(s => s.prueba_fija)
+    .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
+}
+
+function graficoPruebasFijasSvg(pruebas) {
+  const ANCHO = 320, ALTO = 110, M = 22;
+  const ys = pruebas.map(p => p.prueba_fija.fc_media);
+  const min = Math.min(...ys) - 3, max = Math.max(...ys) + 3;
+  const x = i => pruebas.length === 1 ? ANCHO / 2 : M + i * (ANCHO - 2 * M) / (pruebas.length - 1);
+  const y = v => ALTO - M + 4 - (v - min) / (max - min) * (ALTO - 2 * M);
+  const linea = pruebas.map((p, i) => `${x(i).toFixed(1)},${y(p.prueba_fija.fc_media).toFixed(1)}`).join(' ');
+  const puntos = pruebas.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.prueba_fija.fc_media).toFixed(1)}" r="3.5" fill="var(--teal)"/><text x="${x(i).toFixed(1)}" y="${(y(p.prueba_fija.fc_media) - 8).toFixed(1)}" font-size="9" text-anchor="middle" fill="var(--text-dim)" font-family="JetBrains Mono, monospace">${Math.round(p.prueba_fija.fc_media)}</text><text x="${x(i).toFixed(1)}" y="${ALTO - 4}" font-size="8.5" text-anchor="middle" fill="var(--text-dim)" font-family="JetBrains Mono, monospace">${p.fecha.slice(5).split('-').reverse().join('/')}</text>`).join('');
+  return `<svg viewBox="0 0 ${ANCHO} ${ALTO}" style="width:100%;height:auto;margin-top:10px;"><polyline points="${linea}" fill="none" stroke="var(--teal)" stroke-width="1.8"/>${puntos}</svg>`;
+}
+
+function renderPruebaFijaWidget() {
+  const el = document.getElementById('pruebaFijaWidget');
+  if (!el || el.dataset.built) return;
+  el.dataset.built = '1';
+  el.innerHTML = `
+    <div class="card">
+      <h3>🧪 Prueba fija mensual · ${PRUEBA_FIJA_W} W</h3>
+      <p class="hint">Una vez al mes en el rodillo, en ERG: 10 min de calentamiento, <b>20 min fijos a ${PRUEBA_FIJA_W} W</b> y 5 min suaves. Wattly la reconoce sola. Mismos vatios cada vez → si tu pulso baja, has mejorado. Hazla con el mismo ventilador, a una cadencia fija y sin entreno duro el día anterior.</p>
+      <button class="primary-btn" id="calcularPruebaFijaBtn" style="margin-top:10px;">Calcular</button>
+      <div id="pruebaFijaResultado" class="simulador-resultado"></div>
+    </div>`;
+  document.getElementById('calcularPruebaFijaBtn').addEventListener('click', async (e) => {
+    const btn = e.target, resEl = document.getElementById('pruebaFijaResultado');
+    btn.disabled = true; btn.textContent = 'Buscando pruebas…'; resEl.innerHTML = '';
+    try {
+      const pruebas = await recalcularPruebasFijas();
+      renderSesiones(); // refleja la etiqueta 🧪 en las tarjetas
+      if (!pruebas.length) {
+        resEl.innerHTML = estadoVacioHtml(`Todavía no hay ninguna prueba: hace falta una sesión de bici de interior con al menos ${Math.round(PRUEBA_FIJA_MIN_SEG / 60)} min seguidos a ${PRUEBA_FIJA_W} W (±${Math.round(PRUEBA_FIJA_MARGEN * 100)}%).`);
+        return;
+      }
+      const ref = pruebas[0].prueba_fija, ult = pruebas[pruebas.length - 1].prueba_fija;
+      const filas = pruebas.slice().reverse().map(p => {
+        const pf = p.prueba_fija;
+        const avisoCad = ref.cadencia_media != null && pf.cadencia_media != null && Math.abs(pf.cadencia_media - ref.cadencia_media) > PRUEBA_FIJA_CADENCIA_DIFF
+          ? ` <span title="Cadencia distinta a la primera prueba (${ref.cadencia_media} rpm): el pulso no es del todo comparable">⚠️</span>` : '';
+        return `<div class="sess-detail-grid" style="margin-top:6px;"><div>${p.fecha}</div><div>FC <b>${pf.fc_media}</b> · deriva <b>${pf.deriva_ppm != null ? (pf.deriva_ppm > 0 ? '+' : '') + pf.deriva_ppm : '—'}</b></div><div>${pf.potencia_media} W · ${pf.duracion_min} min</div><div>${pf.cadencia_media ?? '—'} rpm${avisoCad}</div></div>`;
+      }).join('');
+      let lectura;
+      if (pruebas.length === 1) {
+        lectura = `Primera prueba registrada: <b>${ref.fc_media} ppm</b> a ${PRUEBA_FIJA_W} W. Es tu referencia; la comparación empieza con la siguiente.`;
+      } else {
+        const d = Math.round((ult.fc_media - ref.fc_media) * 10) / 10;
+        const clase = d <= -2 ? 'up' : d >= 2 ? 'down' : 'warn';
+        lectura = `<div class="aclimatacion-delta"><div class="valor ${clase}">${d > 0 ? '+' : ''}${d} ppm</div><p class="hint">${d <= -2 ? 'Mismos vatios con menos pulso que en tu primera prueba: tu base aeróbica ha mejorado.' : d >= 2 ? 'Más pulso que en tu primera prueba para los mismos vatios: puede ser fatiga, calor, peor descanso… o pérdida de forma. Mira la tendencia, no una sola prueba.' : 'Prácticamente igual que en tu primera prueba (±2 ppm entra dentro del ruido normal del pulso).'}${ref.cadencia_media != null && ult.cadencia_media != null && Math.abs(ult.cadencia_media - ref.cadencia_media) > PRUEBA_FIJA_CADENCIA_DIFF ? ` ⚠️ Ojo: en la última fuiste a ${ult.cadencia_media} rpm y en la primera a ${ref.cadencia_media}; con otra cadencia el pulso cambia, así que la comparación es menos fiable.` : ''}</p></div>`;
+      }
+      resEl.innerHTML = `${lectura}${pruebas.length >= 2 ? graficoPruebasFijasSvg(pruebas) : ''}${filas}
+        <p class="hint" style="margin-top:8px; opacity:.75">FC = media del bloque sin sus 5 primeros minutos. Deriva = cuánto sube el pulso de la primera a la segunda mitad. Comparado siempre con tu primera prueba (${pruebas[0].fecha}).</p>`;
+    } catch (err) {
+      console.error(err);
+      resEl.innerHTML = `<p class="hint" style="color:var(--red);">Error: ${err.message}</p>`;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Calcular';
+    }
+  });
+}
+
+// ---------- Cómo te afecta el calor ----------
+// Cruza el desacople cardíaco de tus carreras con la sensación térmica REAL
+// (solo sesiones con dato de Open-Meteo, nunca la del reloj). Bandas fijas
+// de 5°C; una banda solo se muestra con suficientes carreras, y la pendiente
+// solo con muestra total suficiente.
+const RESP_CALOR_MIN_POR_BANDA = 3;
+const RESP_CALOR_MIN_TOTAL = 8;
+const RESP_CALOR_BANDAS = [
+  { lbl: '< 10°', min: -99, max: 10 },
+  { lbl: '10–15°', min: 10, max: 15 },
+  { lbl: '15–20°', min: 15, max: 20 },
+  { lbl: '20–25°', min: 20, max: 25 },
+  { lbl: '≥ 25°', min: 25, max: 99 }
+];
+
+async function calcularRespuestaCalor(sesiones) {
+  const candidatas = sesiones.filter(s => categoriaDisciplina(s.tipo) === 'running' && s.tiene_track && s.meteo && s.meteo.sensacion_c != null);
+  const sinMeteo = sesiones.filter(s => categoriaDisciplina(s.tipo) === 'running' && s.tiene_track && !s.es_interior && !(s.meteo && s.meteo.sensacion_c != null)).length;
+  const datos = [];
+  for (const s of candidatas) {
+    try {
+      const tr = await getTrack(s.id);
+      const d = calcularDesacopleCardiaco(tr?.points);
+      if (d.disponible) datos.push({ x: s.meteo.sensacion_c, y: d.desacople_pct });
+    } catch (err) { console.error('Respuesta al calor:', s.id, err); }
+  }
+  if (datos.length < RESP_CALOR_MIN_TOTAL) {
+    return { disponible: false, motivo: `Solo ${datos.length} carreras tienen a la vez sensación térmica real y desacople calculable (potencia+FC, 20+ min). Hacen falta al menos ${RESP_CALOR_MIN_TOTAL}.${sinMeteo ? ` Tienes ${sinMeteo} carreras sin tiempo: pulsa "Completar tiempo" en Ajustes.` : ''}` };
+  }
+  const bandas = RESP_CALOR_BANDAS.map(b => {
+    const ys = datos.filter(p => p.x >= b.min && p.x < b.max).map(p => p.y);
+    return { ...b, n: ys.length, media: ys.length ? mediaDe(ys) : null };
+  }).filter(b => b.n >= RESP_CALOR_MIN_POR_BANDA);
+  if (bandas.length < 2) {
+    return { disponible: false, motivo: `Tus ${datos.length} carreras con dato caen casi todas en el mismo rango de sensación térmica — hace falta variedad (al menos ${RESP_CALOR_MIN_POR_BANDA} carreras en dos rangos distintos) para ver cómo te afecta.` };
+  }
+  // pendiente por mínimos cuadrados (puntos de desacople por cada 5°C)
+  const mx = mediaDe(datos.map(p => p.x)), my = mediaDe(datos.map(p => p.y));
+  let num = 0, den = 0;
+  for (const p of datos) { num += (p.x - mx) * (p.y - my); den += (p.x - mx) ** 2; }
+  const pendiente5 = den > 0 ? Math.round(num / den * 5 * 10) / 10 : null;
+  return { disponible: true, bandas, n: datos.length, pendiente5, sinMeteo };
+}
+
+function renderRespuestaCalorWidget() {
+  const el = document.getElementById('respuestaCalorWidget');
+  if (!el || el.dataset.built) return;
+  el.dataset.built = '1';
+  el.innerHTML = `
+    <div class="card">
+      <h3>🥵 Cómo te afecta el calor <span class="beta-tag">beta</span></h3>
+      <p class="hint">Tu desacople cardíaco medio según la sensación térmica real (Open-Meteo) de cada carrera. Cuanto más sube con el calor, más te penaliza.</p>
+      <button class="primary-btn" id="calcularRespuestaCalorBtn" style="margin-top:10px;">Calcular</button>
+      <div id="respuestaCalorResultado" class="simulador-resultado"></div>
+    </div>`;
+  document.getElementById('calcularRespuestaCalorBtn').addEventListener('click', async (e) => {
+    const btn = e.target;
+    const resEl = document.getElementById('respuestaCalorResultado');
+    btn.disabled = true; btn.textContent = 'Calculando…'; resEl.innerHTML = '';
+    try {
+      const r = await calcularRespuestaCalor(loadSesionesMeta());
+      if (!r.disponible) { resEl.innerHTML = estadoVacioHtml(r.motivo); return; }
+      const maxAbs = Math.max(...r.bandas.map(b => Math.abs(b.media)), 1);
+      const filas = r.bandas.map(b => {
+        const color = b.media >= 8 ? 'var(--red)' : b.media >= 5 ? 'var(--amber)' : 'var(--teal)';
+        const ancho = Math.max(4, Math.round(Math.abs(b.media) / maxAbs * 100));
+        return `<div class="calor-banda"><span class="lbl">${b.lbl}</span><div class="barra"><div style="width:${ancho}%; background:${color};"></div></div><span class="val">${b.media > 0 ? '+' : ''}${b.media.toFixed(1)}% <span style="opacity:.6">(${b.n})</span></span></div>`;
+      }).join('');
+      let lectura = '';
+      if (r.pendiente5 != null) {
+        lectura = r.pendiente5 >= 1
+          ? `Por cada 5°C más de sensación térmica, tu desacople sube unos <b>${r.pendiente5} puntos</b>.`
+          : r.pendiente5 <= -1
+            ? `Curioso: con más calor tu desacople baja (${r.pendiente5} puntos cada 5°C). Puede que en días calurosos vayas más suave — mira el contexto antes de sacar conclusiones.`
+            : `El calor apenas cambia tu desacople (${r.pendiente5 > 0 ? '+' : ''}${r.pendiente5} puntos cada 5°C).`;
+      }
+      resEl.innerHTML = `${filas}
+        <p class="hint" style="margin-top:8px;">${lectura}</p>
+        <p class="hint" style="margin-top:4px; opacity:.75">${r.n} carreras con dato. Entre paréntesis, carreras por rango; solo se muestran rangos con ${RESP_CALOR_MIN_POR_BANDA} o más. El desacople también depende del ritmo y la fatiga, no solo del calor.${r.sinMeteo ? ` ${r.sinMeteo} carreras aún sin tiempo (Ajustes → Completar tiempo).` : ''}</p>`;
+    } catch (err) {
+      console.error(err);
+      resEl.innerHTML = `<p class="hint" style="color:var(--red);">Error: ${err.message}</p>`;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Calcular';
+    }
+  });
+}
+
 function renderAclimatacionWidget() {
   const el = document.getElementById('aclimatacionWidget');
   if (!el || el.dataset.built) return; // se construye una sola vez; el cálculo es bajo demanda (recorre varios tracks, no conviene relanzarlo en cada refresco)
@@ -11728,7 +12178,7 @@ function renderAclimatacionWidget() {
   el.innerHTML = `
     <div class="card">
       <h3>🌡️ Aclimatación al calor <span class="beta-tag">beta</span></h3>
-      <p class="hint">Compara tu desacople cardíaco en tus primeras carreras con calor (≥${UMBRAL_CALOR_MODERADO}°C) frente a las más recientes. Si baja, tu cuerpo se ha ido acostumbrando.</p>
+      <p class="hint">Compara tu desacople cardíaco en tus primeras carreras con calor (≥${UMBRAL_CALOR_MODERADO}°C de sensación térmica; si una carrera no tiene tiempo real, se usa la temperatura del reloj) frente a las más recientes. Si baja, tu cuerpo se ha ido acostumbrando.</p>
       <button class="primary-btn" id="calcularAclimatacionBtn" style="margin-top:10px;">Calcular</button>
       <div id="aclimatacionResultado" class="simulador-resultado"></div>
     </div>
@@ -12570,6 +13020,38 @@ document.getElementById('confirmImportBtn').addEventListener('click', async () =
     statusEl.className = 'status err';
   }
 });
+// ---------- Completar tiempo de sesiones antiguas ----------
+document.getElementById('completarMeteoBtn').addEventListener('click', async (e) => {
+  const btn = e.target;
+  const st = document.getElementById('completarMeteoStatus');
+  const pendientes = loadSesionesMeta().filter(s => s.tiene_track && !s.es_interior && !s.meteo);
+  if (!pendientes.length) {
+    st.textContent = 'Todas las sesiones con GPS ya tienen el tiempo.';
+    st.className = 'status ok';
+    return;
+  }
+  btn.disabled = true;
+  let ok = 0, sinDato = 0, fallos = 0;
+  for (let i = 0; i < pendientes.length; i++) {
+    st.textContent = `Buscando tiempo ${i + 1} de ${pendientes.length}…`;
+    st.className = 'status';
+    try {
+      const tr = await getTrack(pendientes[i].id);
+      const m = await completarMeteoSesion(pendientes[i], tr?.points || []);
+      if (m) ok++; else sinDato++;
+    } catch (err) {
+      fallos++;
+      console.warn('Open-Meteo:', pendientes[i].id, err.message);
+      if (!navigator.onLine) break;
+    }
+    await new Promise(r => setTimeout(r, 120)); // no saturar la API
+  }
+  btn.disabled = false;
+  st.textContent = `Listo: ${ok} sesiones con tiempo${sinDato ? `, ${sinDato} sin datos de GPS útiles` : ''}${fallos ? `, ${fallos} fallidas (vuelve a pulsar para reintentar)` : ''}.`;
+  st.className = fallos ? 'status err' : 'status ok';
+  renderSesiones();
+});
+
 // ---------- PWA: modo sin conexión, almacenamiento protegido e instalación ----------
 // Solo actúa cuando la app se abre desde una web https (PWA). En la APK no hace nada.
 (function iniciarPwa() {
