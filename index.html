@@ -145,6 +145,21 @@
   .ipd-barra-val.up{ color:var(--teal); }
   .ipd-barra-val.warn{ color:var(--amber); }
   .ipd-barra-val.down{ color:var(--red); }
+  .pv-resumen{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
+  .pv-resumen > div{ background:var(--surface); border-radius:10px; padding:10px; text-align:center; }
+  .pv-resumen .etiqueta{ font-size:10.5px; color:var(--text-dim); text-transform:uppercase; }
+  .pv-resumen .valor{ font-family:'JetBrains Mono',monospace; font-size:18px; margin-top:4px; }
+  .pv-card{ background:var(--surface); border-radius:12px; padding:12px; margin-top:10px; cursor:pointer; }
+  .pv-card h4{ font-family:'Space Grotesk',sans-serif; font-size:14px; display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+  .pv-card .pv-stats{ font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--text-dim); margin-top:6px; line-height:1.6; }
+  .pv-card .pv-detalle{ display:none; margin-top:10px; cursor:default; }
+  .pv-card.open .pv-detalle{ display:block; }
+  .pv-tabla{ width:100%; border-collapse:collapse; font-family:'JetBrains Mono',monospace; font-size:11px; margin-top:6px; }
+  .pv-tabla th{ color:var(--text-dim); font-weight:500; text-align:right; padding:3px 2px; border-bottom:1px solid var(--line); }
+  .pv-tabla td{ text-align:right; padding:4px 2px; border-bottom:1px solid var(--surface-2); }
+  .pv-tabla th:first-child, .pv-tabla td:first-child{ text-align:left; }
+  .pv-tabla .gana{ color:var(--teal); } .pv-tabla .pierde{ color:var(--red); }
+  .pv-sub{ font-family:'Space Grotesk',sans-serif; font-size:12.5px; margin-top:14px; color:var(--text); }
   .meteo-tag{ font-size:11.5px; color:var(--text-dim); margin-top:6px; font-family:'JetBrains Mono',monospace; }
   .calor-banda{ display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12px; }
   .calor-banda .lbl{ width:78px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; }
@@ -585,6 +600,7 @@
     </div>
 
     <div class="tab-panel" id="panel-rutas">
+      <div id="puertosVirtualesWidget"></div>
       <div id="gpxAnalisisWidget"></div>
       <div id="tramosList"></div>
     </div>
@@ -1471,6 +1487,10 @@ function buildSesionFromFit(messages) {
   // fallback aquí, alt/spd quedan null en el 100% de los puntos de esas
   // sesiones — rompiendo silenciosamente todo lo que depende de pendiente
   // (detección de puertos, tramos llanos, etc.) sin ningún error visible.
+  const fileId = (messages.fileIdMesgs || [])[0] || {};
+  const esVirtual = session.subSport === 'virtualActivity' ||
+    fileId.manufacturer === 'virtualtraining' ||
+    /rouvy/i.test(fileId.productName || '');
   const altitudeDe = r => r.altitude ?? r.enhancedAltitude ?? null;
   const speedDe = r => r.speed ?? r.enhancedSpeed ?? null;
   const track = records
@@ -1488,7 +1508,11 @@ function buildSesionFromFit(messages) {
       // falta el detalle punto a punto para el detector de ruptura de forma,
       // que busca CUÁNDO se degrada la mecánica, no solo el promedio.
       vo: r.verticalOscillation != null ? Number(r.verticalOscillation.toFixed(1)) : null,
-      ct: r.stanceTime != null ? Number(r.stanceTime.toFixed(0)) : null
+      ct: r.stanceTime != null ? Number(r.stanceTime.toFixed(0)) : null,
+      ...(esVirtual ? {
+        valt: altitudeDe(r) != null ? Number(altitudeDe(r).toFixed(1)) : null,
+        vd: r.distance != null ? Math.round(r.distance) : null
+      } : {})
     }));
 
   // Marca de interior: si hay puntos válidos pero NINGUNO con coordenadas,
@@ -1502,10 +1526,9 @@ function buildSesionFromFit(messages) {
   // GPS (mapa, tiempo de Open-Meteo, viento, tramos, velocidad) las trate
   // como una salida de verdad. Potencia, FC y cadencia sí son reales.
   // El balance izq/dcha de Rouvy viene fijo al 50%: no se usa.
-  const fileId = (messages.fileIdMesgs || [])[0] || {};
-  const esVirtual = session.subSport === 'virtualActivity' ||
-    fileId.manufacturer === 'virtualtraining' ||
-    /rouvy/i.test(fileId.productName || '');
+  // Perfil de la ruta virtual: se conserva aparte (valt = altitud, vd = distancia
+  // acumulada en m) para los análisis de puertos de Rouvy; ningún análisis de
+  // GPS/terreno real lee estos campos.
   if (esVirtual) {
     for (const p of track) { p.lat = null; p.lon = null; p.alt = null; p.spd = null; }
   }
@@ -1571,6 +1594,7 @@ function buildSesionFromFit(messages) {
 // ("ROUVY_Tour_of_Slovenia_Ljubljana_Semana_12_.fit" → "Tour of Slovenia Ljubljana Semana 12")
 function nombreRutaVirtualDeFichero(nombre) {
   if (!nombre) return null;
+  if (/^\d+(\.fit)?$/i.test(nombre.trim())) return null; // export de Strava: el nombre es solo el id de la actividad
   const limpio = nombre.replace(/\.fit$/i, '').replace(/^rouvy[_\s-]*/i, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
   return limpio || null;
 }
@@ -2997,6 +3021,276 @@ function detalleVientoHtml(s) {
   return `<p class="hint" style="margin-top:6px;">💨 Viento sobre tu marcha: <b>${v.pct_cara}%</b> del tiempo de cara, <b>${v.pct_favor}%</b> a favor · neto ${neto}. <span style="opacity:.75">(Viento a 10 m de altura de Open-Meteo: sirve para comparar salidas, no como cifra exacta.)</span></p>`;
 }
 const ACLIMATACION_MIN_SESIONES_CALOR = 6; // mínimo de sesiones calientes con desacople calculable para comparar "antes" vs "ahora"
+
+// ============================================================
+// PUERTOS VIRTUALES (Rouvy)
+// Usa el perfil de la ruta virtual guardado aparte en el track (valt, vd):
+// detecta cada subida con el mismo detector que los GPX (detectarPuertos),
+// mide cada intento con tus datos reales (potencia, FC, cadencia) y agrupa
+// los intentos del mismo puerto comparando la FORMA del perfil, no el
+// nombre (al exportar desde Strava el fichero pierde el nombre de la ruta).
+// ============================================================
+const LS_PUERTOS_NOMBRES = 'em_puertos_nombres';
+const PV_TRAMO_M = 100;              // resolución de las comparaciones (cada 100 m)
+const PV_TOL_DIST = 0.05;            // ±5% de longitud para ser "el mismo puerto"
+const PV_TOL_DESNIVEL_M = 15;        // y desnivel parecido (o ±5%, lo que sea mayor)
+const PV_TOL_PERFIL_RMSE_M = 8;      // y perfiles que se superpongan (error medio ≤ 8 m)
+const PV_MIN_SEG_WKG = 5 * 60;       // para la evolución de W/kg solo cuentan subidas de 5 min o más
+const PV_EVEREST_M = 8849;
+
+function loadNombresPuertos() { try { return JSON.parse(localStorage.getItem(LS_PUERTOS_NOMBRES) || '{}'); } catch { return {}; } }
+function guardarNombrePuerto(clave, nombre) {
+  const m = loadNombresPuertos();
+  if (nombre && nombre.trim()) m[clave] = nombre.trim(); else delete m[clave];
+  localStorage.setItem(LS_PUERTOS_NOMBRES, JSON.stringify(m));
+}
+
+// Peso corporal vigente en una fecha: el último guardado en o antes de esa fecha (o el más antiguo si todos son posteriores)
+function pesoCorporalEnFecha(fecha) {
+  const pesos = loadPesos().filter(p => p.kg > 0).sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+  if (!pesos.length) return null;
+  const previos = pesos.filter(p => (p.fecha || '') <= fecha);
+  return (previos.length ? previos[previos.length - 1] : pesos[0]).kg;
+}
+
+function construirPerfilVirtual(points) {
+  const pts = (points || []).filter(p => p.vd != null && p.valt != null);
+  if (pts.length < 10) return { bins: [], distanciaTotalKm: 0 };
+  const distanciaTotal = pts[pts.length - 1].vd;
+  if (distanciaTotal < 500) return { bins: [], distanciaTotalKm: 0 };
+  const nBins = Math.floor(distanciaTotal / PERFIL_BIN_METROS);
+  const crudos = [];
+  let idx = 0;
+  for (let b = 0; b <= nBins; b++) {
+    const d = b * PERFIL_BIN_METROS;
+    while (idx < pts.length - 1 && pts[idx].vd < d) idx++;
+    crudos.push({ distM: d, ele: pts[idx].valt });
+  }
+  // El perfil de Rouvy es limpio (no es GPS): suavizado más corto que en los GPX
+  const ventana = 2;
+  const bins = crudos.map((b, i) => {
+    const v = crudos.slice(Math.max(0, i - ventana), Math.min(crudos.length, i + ventana + 1)).map(x => x.ele);
+    return { distM: b.distM, ele: Number((v.reduce((a, c) => a + c, 0) / v.length).toFixed(1)) };
+  });
+  for (let i = 0; i < bins.length; i++) {
+    bins[i].pendientePct = i === 0 ? 0 : Number((((bins[i].ele - bins[i - 1].ele) / PERFIL_BIN_METROS) * 100).toFixed(1));
+  }
+  return { bins, distanciaTotalKm: Number((distanciaTotal / 1000).toFixed(2)) };
+}
+
+// Primer índice con vd >= d (búsqueda binaria; vd es creciente)
+function _idxPorDistancia(pts, d) {
+  let lo = 0, hi = pts.length - 1;
+  if (pts[hi].vd < d) return -1;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (pts[mid].vd < d) lo = mid + 1; else hi = mid; }
+  return lo;
+}
+function _tiempoEnDistancia(pts, d) {
+  const i = _idxPorDistancia(pts, d);
+  if (i < 0) return null;
+  if (i === 0 || pts[i].vd === d) return pts[i].t;
+  const a = pts[i - 1], b = pts[i];
+  const f = (d - a.vd) / Math.max(1e-6, b.vd - a.vd);
+  return a.t + f * (b.t - a.t);
+}
+
+function analizarSubidasVirtuales(sesion, points) {
+  const pts = (points || []).filter(p => p.vd != null && p.valt != null && p.t != null);
+  const perfil = construirPerfilVirtual(pts);
+  if (!perfil.bins.length) return [];
+  const puertos = detectarPuertos(perfil);
+  const media = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+  const salida = [];
+  puertos.forEach((pt0, k) => {
+    // Recorta el rellano final/inicial que el detector tolera dentro de un puerto:
+    // el puerto acaba en su punto más alto y empieza en el más bajo antes de él.
+    const B = perfil.bins;
+    let iMax = pt0.inicioIdx; for (let i = pt0.inicioIdx; i <= pt0.finIdx; i++) if (B[i].ele > B[iMax].ele) iMax = i;
+    let iMin = pt0.inicioIdx; for (let i = pt0.inicioIdx; i <= iMax; i++) if (B[i].ele < B[iMin].ele) iMin = i;
+    const distRec = B[iMax].distM - B[iMin].distM, desRec = B[iMax].ele - B[iMin].ele;
+    if (distRec < PUERTO_DIST_MIN_M || desRec < PUERTO_DESNIVEL_MIN_M) return;
+    const pt = {
+      inicioIdx: iMin, finIdx: iMax, desnivelM: Math.round(desRec),
+      pendienteMediaPct: Number((desRec / distRec * 100).toFixed(1)),
+      pendienteMaxPct: Number(Math.max(...B.slice(iMin + 1, iMax + 1).map(b => b.pendientePct)).toFixed(1))
+    };
+    const dIni = perfil.bins[pt.inicioIdx].distM, dFin = perfil.bins[pt.finIdx].distM;
+    const tIni = _tiempoEnDistancia(pts, dIni), tFin = _tiempoEnDistancia(pts, dFin);
+    if (tIni == null || tFin == null || tFin <= tIni) return;
+    const dentro = pts.filter(p => p.t >= tIni && p.t <= tFin);
+    const tiempoSeg = (tFin - tIni) / 1000;
+    const pw = media(dentro.map(p => p.pw).filter(v => v != null));
+    const hr = media(dentro.map(p => p.hr).filter(v => v != null && v > 0));
+    const cad = media(dentro.map(p => p.cad).filter(v => v != null && v > 0));
+    // tramos de 100 m: tiempo acumulado, potencia y FC de cada tramo, altitud relativa
+    const tramos = [];
+    const altBase = pts[Math.max(0, _idxPorDistancia(pts, dIni))].valt;
+    for (let d = dIni; d < dFin - 1; d += PV_TRAMO_M) {
+      const dHasta = Math.min(d + PV_TRAMO_M, dFin);
+      const ta = _tiempoEnDistancia(pts, d), tb = _tiempoEnDistancia(pts, dHasta);
+      const seg = pts.filter(p => p.t >= ta && p.t <= tb);
+      const ib = _idxPorDistancia(pts, dHasta);
+      tramos.push({
+        dRel: Math.round(dHasta - dIni),
+        tAcum: Math.round((tb - tIni) / 100) / 10,
+        pw: seg.length ? Math.round(media(seg.map(p => p.pw).filter(v => v != null))) : null,
+        hr: seg.length ? Math.round(media(seg.map(p => p.hr).filter(v => v != null && v > 0)) || 0) || null : null,
+        altRel: Math.round((pts[ib >= 0 ? ib : pts.length - 1].valt - altBase) * 10) / 10
+      });
+    }
+    const altInicio = perfil.bins[pt.inicioIdx].ele;
+    const perfilRel = perfil.bins.slice(pt.inicioIdx, pt.finIdx + 1).map(b => Math.round((b.ele - altInicio) * 10) / 10);
+    const peso = pesoCorporalEnFecha(sesion.fecha);
+    salida.push({
+      sesionId: sesion.id, fecha: sesion.fecha, hora: sesion.hora, ruta: sesion.ruta_virtual || null,
+      ordenEnRuta: k + 1, totalEnRuta: puertos.length,
+      dIni, distM: Math.round(dFin - dIni), desnivelM: pt.desnivelM,
+      pendienteMediaPct: pt.pendienteMediaPct, pendienteMaxPct: pt.pendienteMaxPct,
+      tiempoSeg: Math.round(tiempoSeg),
+      pw: pw != null ? Math.round(pw) : null, hr: hr != null ? Math.round(hr) : null, cad: cad != null ? Math.round(cad) : null,
+      vam: Math.round(pt.desnivelM / tiempoSeg * 3600),
+      wkg: (pw != null && peso) ? Math.round(pw / peso * 100) / 100 : null,
+      perfilRel, tramos
+    });
+  });
+  return salida;
+}
+
+// Remuestrea un perfil relativo a n puntos (para comparar formas de distinta resolución)
+function _remuestrear(arr, n) {
+  if (arr.length === 1) return Array(n).fill(arr[0]);
+  return Array.from({ length: n }, (_, i) => {
+    const x = i * (arr.length - 1) / (n - 1), a = Math.floor(x), f = x - a;
+    return a + 1 < arr.length ? arr[a] + f * (arr[a + 1] - arr[a]) : arr[a];
+  });
+}
+function mismoPuertoVirtual(a, b) {
+  if (Math.abs(a.distM - b.distM) / Math.max(a.distM, b.distM) > PV_TOL_DIST) return false;
+  if (Math.abs(a.desnivelM - b.desnivelM) > Math.max(PV_TOL_DESNIVEL_M, 0.05 * Math.max(a.desnivelM, b.desnivelM))) return false;
+  const ra = _remuestrear(a.perfilRel, 30), rb = _remuestrear(b.perfilRel, 30);
+  const rmse = Math.sqrt(ra.reduce((acc, v, i) => acc + (v - rb[i]) ** 2, 0) / ra.length);
+  return rmse <= PV_TOL_PERFIL_RMSE_M;
+}
+
+function agruparPuertosVirtuales(subidas) {
+  const orden = subidas.slice().sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
+  const grupos = [];
+  for (const s of orden) {
+    const g = grupos.find(g => mismoPuertoVirtual(g.intentos[0], s));
+    if (g) g.intentos.push(s);
+    else grupos.push({ clave: `${s.sesionId}@${Math.round(s.dIni)}`, intentos: [s] });
+  }
+  const nombres = loadNombresPuertos();
+  for (const g of grupos) {
+    const ref = g.intentos[0];
+    g.mejor = g.intentos.reduce((m, x) => x.tiempoSeg < m.tiempoSeg ? x : m);
+    g.ultimo = g.intentos[g.intentos.length - 1];
+    const conRuta = g.intentos.find(x => x.ruta);
+    const nombreAuto = conRuta
+      ? conRuta.ruta + (conRuta.totalEnRuta > 1 ? ` · subida ${conRuta.ordenEnRuta}` : '')
+      : `Subida de ${(ref.distM / 1000).toFixed(1).replace('.', ',')} km al ${String(ref.pendienteMediaPct).replace('.', ',')}%`;
+    g.nombre = nombres[g.clave] || nombreAuto;
+    g.distM = ref.distM; g.desnivelM = ref.desnivelM; g.pendienteMediaPct = ref.pendienteMediaPct; g.pendienteMaxPct = ref.pendienteMaxPct;
+  }
+  return grupos.sort((a, b) => (b.ultimo.fecha + b.ultimo.hora).localeCompare(a.ultimo.fecha + a.ultimo.hora));
+}
+
+async function calcularPuertosVirtuales(sesiones) {
+  const virtuales = sesiones.filter(s => s.es_virtual && s.tiene_track && categoriaDisciplina(s.tipo) === 'cycling');
+  const subidas = [];
+  let sinPerfil = 0;
+  for (const s of virtuales) {
+    try {
+      const tr = await getTrack(s.id);
+      const pts = tr?.points || [];
+      if (!pts.some(p => p.vd != null)) { sinPerfil++; continue; }
+      subidas.push(...analizarSubidasVirtuales(s, pts));
+    } catch (err) { console.error('Puertos virtuales:', s.id, err); }
+  }
+  const grupos = agruparPuertosVirtuales(subidas);
+  const desnivelTotalM = virtuales.reduce((a, s) => a + (s.datos_suunto.ascenso_m || 0), 0);
+  // Evolución mensual de W/kg en subida (subidas de 5 min o más)
+  const porMes = {};
+  for (const x of subidas) {
+    if (x.wkg == null || x.tiempoSeg < PV_MIN_SEG_WKG) continue;
+    const mes = x.fecha.slice(0, 7);
+    (porMes[mes] = porMes[mes] || []).push(x);
+  }
+  const evolucion = Object.keys(porMes).sort().map(mes => ({
+    mes, mejor: Math.max(...porMes[mes].map(x => x.wkg)),
+    media: Math.round(porMes[mes].reduce((a, x) => a + x.wkg, 0) / porMes[mes].length * 100) / 100,
+    n: porMes[mes].length
+  }));
+  return {
+    grupos, subidas, sesionesVirtuales: virtuales.length, sinPerfil,
+    desnivelTotalM, everest: desnivelTotalM / PV_EVEREST_M,
+    kmSubida: subidas.reduce((a, x) => a + x.distM, 0) / 1000,
+    evolucion, hayPeso: loadPesos().some(p => p.kg > 0)
+  };
+}
+
+// Comparación kilómetro a kilómetro (y cada 100 m para la gráfica) entre dos intentos del mismo puerto.
+// diferencia > 0 = el intento "hoy" va POR DELANTE (ha tardado menos en llegar a ese punto)
+function compararIntentosPuerto(hoy, ref) {
+  const n = Math.min(hoy.tramos.length, ref.tramos.length);
+  const serie = [];
+  for (let i = 0; i < n; i++) serie.push({ dRel: hoy.tramos[i].dRel, ventajaSeg: Math.round((ref.tramos[i].tAcum - hoy.tramos[i].tAcum) * 10) / 10 });
+  const porKm = [];
+  const tramosKm = Math.max(1, Math.round(1000 / PV_TRAMO_M));
+  for (let i = 0; i < n; i += tramosKm) {
+    const j = Math.min(i + tramosKm, n) - 1;
+    const h = hoy.tramos.slice(i, j + 1), r = ref.tramos.slice(i, j + 1);
+    const med = (arr, k) => { const v = arr.map(x => x[k]).filter(v => v != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
+    const tH = hoy.tramos[j].tAcum - (i > 0 ? hoy.tramos[i - 1].tAcum : 0);
+    const tR = ref.tramos[j].tAcum - (i > 0 ? ref.tramos[i - 1].tAcum : 0);
+    porKm.push({
+      km: porKm.length + 1, hastaM: hoy.tramos[j].dRel,
+      pendientePct: Math.round(((hoy.tramos[j].altRel - (i > 0 ? hoy.tramos[i - 1].altRel : 0)) / (hoy.tramos[j].dRel - (i > 0 ? hoy.tramos[i - 1].dRel : 0))) * 1000) / 10,
+      ganadoSeg: Math.round((tR - tH) * 10) / 10,
+      pwHoy: med(h, 'pw'), pwRef: med(r, 'pw'), hrHoy: med(h, 'hr'), hrRef: med(r, 'hr')
+    });
+  }
+  return { serie, porKm, totalSeg: ref.tiempoSeg - hoy.tiempoSeg };
+}
+
+// Plan de ritmo: potencia media sostenible para la duración prevista (modelo CP+W'
+// de tu curva de potencia) repartida por kilómetros: algo más en las rampas
+// duras y algo menos en los descansos (±8% como máximo), que es como se
+// sube más rápido con el mismo gasto. Tiempo con la física del simulador.
+const PV_PLAN_FACTOR_PENDIENTE = 0.025; // +2,5% de vatios por cada punto de pendiente sobre la media del puerto
+const PV_PLAN_MAX_VARIACION = 0.08;
+async function calcularPlanRitmoPuerto(sesiones, grupo, pesoTotalKg) {
+  const curva = await conVentanaYFallback(calcularCurvaPotencia, sesiones, { disciplina: 'cycling' }, VENTANA_ESTIMACION_DIAS);
+  if (!curva.disponible) return { disponible: false, motivo: 'Necesitas curva de potencia de bici calculable (Stats) para hacer un plan de ritmo.' };
+  const modelo = calcularModeloCPW(curva);
+  if (!modelo.disponible) return { disponible: false, motivo: modelo.motivo };
+  const ref = grupo.mejor;
+  const kms = [];
+  const tramosKm = Math.round(1000 / PV_TRAMO_M);
+  for (let i = 0; i < ref.tramos.length; i += tramosKm) {
+    const j = Math.min(i + tramosKm, ref.tramos.length) - 1;
+    const d0 = i > 0 ? ref.tramos[i - 1].dRel : 0, a0 = i > 0 ? ref.tramos[i - 1].altRel : 0;
+    const dist = ref.tramos[j].dRel - d0;
+    kms.push({ km: kms.length + 1, distM: dist, pendientePct: Math.round((ref.tramos[j].altRel - a0) / dist * 1000) / 10 });
+  }
+  const gMedia = ref.pendienteMediaPct;
+  let duracion = ref.tiempoSeg, P = null, conf = null, filas = [];
+  for (let iter = 0; iter < 8; iter++) {
+    const base = potenciaEstimadaDuracion(modelo, duracion);
+    P = base.potenciaW; conf = base.confianza;
+    let tTotal = 0; filas = [];
+    for (const k of kms) {
+      const factor = Math.max(1 - PV_PLAN_MAX_VARIACION, Math.min(1 + PV_PLAN_MAX_VARIACION, 1 + PV_PLAN_FACTOR_PENDIENTE * (k.pendientePct - gMedia)));
+      const w = Math.round(P * factor);
+      const t = k.distM / velocidadParaPotencia(w, pesoTotalKg, k.pendientePct);
+      tTotal += t;
+      filas.push({ ...k, vatios: w, tiempoSeg: Math.round(t), acumSeg: Math.round(tTotal) });
+    }
+    if (Math.abs(tTotal - duracion) < 3) { duracion = tTotal; break; }
+    duracion = tTotal;
+  }
+  return { disponible: true, potenciaMediaW: P, confianza: conf, duracionSeg: Math.round(duracion), filas, modelo, mejorRealSeg: ref.tiempoSeg };
+}
 
 // ---------- Prueba fija mensual (rodillo, ERG a vatios fijos) ----------
 // Siempre los MISMOS vatios (no un % del FTP): si cambiaran con el FTP, ya
@@ -13020,6 +13314,197 @@ document.getElementById('confirmImportBtn').addEventListener('click', async () =
     statusEl.className = 'status err';
   }
 });
+// ---------- Mis puertos (Rouvy): pasaporte, intentos, comparación, plan y W/kg ----------
+let _pvResultado = null;
+const _escHtml = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const _fmtMinSeg = seg => { seg = Math.round(seg); const m = Math.floor(seg / 60), s2 = seg % 60; return `${m}:${String(s2).padStart(2, '0')}`; };
+const _fmtSigno = (v, dec = 0) => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(dec);
+
+function _svgPerfilPuerto(perfilRel) {
+  const W = 300, H = 46;
+  const max = Math.max(...perfilRel, 1), n = perfilRel.length;
+  const pts = perfilRel.map((v, i) => `${(i / (n - 1) * W).toFixed(1)},${(H - 2 - v / max * (H - 6)).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;margin-top:6px;" preserveAspectRatio="none"><polygon points="0,${H} ${pts} ${W},${H}" fill="var(--amber)" opacity=".18"/><polyline points="${pts}" fill="none" stroke="var(--amber)" stroke-width="1.6"/></svg>`;
+}
+
+function _svgVentaja(serie, distM) {
+  const W = 300, H = 110, M = 14;
+  const vals = serie.map(x => x.ventajaSeg);
+  const lim = Math.max(5, ...vals.map(Math.abs));
+  const y = v => H / 2 - v / lim * (H / 2 - M);
+  const x = d => d / distM * W;
+  const pts = serie.map(p => `${x(p.dRel).toFixed(1)},${y(p.ventajaSeg).toFixed(1)}`).join(' ');
+  const ult = serie[serie.length - 1];
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;margin-top:6px;">
+    <line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="var(--line)" stroke-dasharray="3 3"/>
+    <text x="2" y="10" font-size="8.5" fill="var(--teal)" font-family="JetBrains Mono, monospace">▲ por delante</text>
+    <text x="2" y="${H - 3}" font-size="8.5" fill="var(--red)" font-family="JetBrains Mono, monospace">▼ por detrás</text>
+    <polyline points="${pts}" fill="none" stroke="${ult.ventajaSeg >= 0 ? 'var(--teal)' : 'var(--red)'}" stroke-width="2"/>
+    <text x="${W - 2}" y="${(y(ult.ventajaSeg) + (ult.ventajaSeg >= 0 ? -5 : 11)).toFixed(1)}" font-size="9.5" text-anchor="end" fill="var(--text)" font-family="JetBrains Mono, monospace">${_fmtSigno(ult.ventajaSeg)} s</text>
+  </svg>`;
+}
+
+function _svgEvolucionWkg(evol) {
+  const W = 300, H = 100, M = 18;
+  const vals = evol.map(e => e.mejor);
+  const min = Math.min(...vals) - 0.1, max = Math.max(...vals) + 0.1;
+  const x = i => evol.length === 1 ? W / 2 : M + i * (W - 2 * M) / (evol.length - 1);
+  const y = v => H - M - (v - min) / (max - min) * (H - 2 * M);
+  const pts = evol.map((e, i) => `${x(i).toFixed(1)},${y(e.mejor).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;margin-top:6px;"><polyline points="${pts}" fill="none" stroke="var(--teal)" stroke-width="1.8"/>${evol.map((e, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(e.mejor).toFixed(1)}" r="3.2" fill="var(--teal)"/><text x="${x(i).toFixed(1)}" y="${(y(e.mejor) - 7).toFixed(1)}" font-size="9" text-anchor="middle" fill="var(--text-dim)" font-family="JetBrains Mono, monospace">${e.mejor.toFixed(2)}</text><text x="${x(i).toFixed(1)}" y="${H - 3}" font-size="8.5" text-anchor="middle" fill="var(--text-dim)" font-family="JetBrains Mono, monospace">${e.mes.slice(5)}/${e.mes.slice(2, 4)}</text>`).join('')}</svg>`;
+}
+
+function _htmlComparacion(g, idxHoy) {
+  const hoy = g.intentos[idxHoy];
+  const otros = g.intentos.filter(x => x !== hoy);
+  const ref = otros.reduce((m, x) => x.tiempoSeg < m.tiempoSeg ? x : m);
+  const etiquetaRef = hoy === g.mejor ? 'tu anterior mejor' : 'tu mejor intento';
+  const c = compararIntentosPuerto(hoy, ref);
+  const filas = c.porKm.map(k => `<tr><td>km ${k.km}</td><td>${k.pendientePct}%</td><td class="${k.ganadoSeg > 0 ? 'gana' : k.ganadoSeg < 0 ? 'pierde' : ''}">${_fmtSigno(k.ganadoSeg)} s</td><td>${k.pwHoy ?? '—'}/${k.pwRef ?? '—'}</td><td>${k.hrHoy ?? '—'}/${k.hrRef ?? '—'}</td></tr>`).join('');
+  const mejorKm = c.porKm.reduce((m, k) => k.ganadoSeg > m.ganadoSeg ? k : m, c.porKm[0]);
+  const peorKm = c.porKm.reduce((m, k) => k.ganadoSeg < m.ganadoSeg ? k : m, c.porKm[0]);
+  let lectura = c.totalSeg > 0
+    ? `Le sacas <b>${Math.round(c.totalSeg)} s</b> a ${etiquetaRef} (${ref.fecha}).`
+    : c.totalSeg < 0 ? `Te quedas a <b>${Math.round(-c.totalSeg)} s</b> de ${etiquetaRef} (${ref.fecha}).` : `Mismo tiempo que ${etiquetaRef}.`;
+  if (c.porKm.length > 1) {
+    if (mejorKm.ganadoSeg > 0) lectura += ` Donde más ganas: km ${mejorKm.km} (${mejorKm.pendientePct}%, ${_fmtSigno(mejorKm.ganadoSeg)} s).`;
+    if (peorKm.ganadoSeg < 0) lectura += ` Donde más pierdes: km ${peorKm.km} (${peorKm.pendientePct}%, ${_fmtSigno(peorKm.ganadoSeg)} s).`;
+  }
+  return `<p class="hint" style="margin-top:4px;">${lectura}</p>
+    ${_svgVentaja(c.serie, hoy.distM)}
+    <table class="pv-tabla"><tr><th>Tramo</th><th>%</th><th>Ganas</th><th>W hoy/ref</th><th>FC hoy/ref</th></tr>${filas}</table>`;
+}
+
+function _htmlDetallePuerto(g, gi) {
+  const filas = g.intentos.slice().reverse().map(x => `<tr><td>${x === g.mejor ? '🏆 ' : ''}${x.fecha}</td><td>${_fmtMinSeg(x.tiempoSeg)}</td><td>${x.pw ?? '—'}</td><td>${x.wkg != null ? x.wkg.toFixed(2) : '—'}</td><td>${x.hr ?? '—'}</td><td>${x.vam}</td></tr>`).join('');
+  let comp = '';
+  if (g.intentos.length >= 2) {
+    const idxDef = g.intentos.length - 1;
+    const opciones = g.intentos.map((x, i) => `<option value="${i}" ${i === idxDef ? 'selected' : ''}>${x.fecha} · ${_fmtMinSeg(x.tiempoSeg)}${x === g.mejor ? ' 🏆' : ''}</option>`).join('');
+    comp = `<div class="pv-sub">⏱️ Contra tu mejor intento</div>
+      <select class="pv-sel-intento" data-g="${gi}" style="margin-top:6px;">${opciones}</select>
+      <div class="pv-comparacion">${_htmlComparacion(g, idxDef)}</div>`;
+  } else {
+    comp = `<div class="pv-sub">⏱️ Contra tu mejor intento</div><p class="hint">Cuando repitas este puerto verás aquí la comparación kilómetro a kilómetro.</p>`;
+  }
+  const pesos = loadPesos().filter(p => p.kg > 0).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const bicis = loadBicis().filter(b => b.kg > 0);
+  const plan = (pesos.length && bicis.length)
+    ? `<div class="simulador-inputs" style="margin-top:6px;"><select class="pv-plan-peso">${pesos.map(p => `<option value="${p.kg}">${_escHtml(p.etiqueta)} · ${p.kg} kg</option>`).join('')}</select><select class="pv-plan-bici">${bicis.map(b => `<option value="${b.kg}">${_escHtml(b.nombre)} · ${b.kg} kg</option>`).join('')}</select></div>
+       <button class="primary-btn pv-plan-btn" data-g="${gi}" style="margin-top:8px;">Calcular plan</button><div class="pv-plan-res"></div>`
+    : `<p class="hint">Guarda tu peso y el de la bici en Ajustes para calcular el plan.</p>`;
+  return `<table class="pv-tabla"><tr><th>Fecha</th><th>Tiempo</th><th>W</th><th>W/kg</th><th>FC</th><th>VAM</th></tr>${filas}</table>
+    ${comp}
+    <div class="pv-sub">🎯 Plan de ritmo</div>
+    <p class="hint" style="margin-top:4px;">Vatios por kilómetro para subirlo lo más rápido posible según tu modelo de potencia: un poco más en las rampas, un poco menos en los descansos.</p>
+    ${plan}`;
+}
+
+function _pintarPuertosVirtuales(resEl) {
+  const r = _pvResultado;
+  if (!r.sesionesVirtuales) { resEl.innerHTML = estadoVacioHtml('Todavía no tienes sesiones de Rouvy importadas.'); return; }
+  const avisoPerfil = r.sinPerfil ? `<p class="hint" style="margin-top:8px;">ℹ️ ${r.sinPerfil} ${r.sinPerfil === 1 ? 'sesión de Rouvy se importó' : 'sesiones de Rouvy se importaron'} antes de que Wattly guardara el perfil de la ruta: vuelve a importarlas (bórralas antes) para que sus puertos aparezcan.</p>` : '';
+  const resumen = `<div class="pv-resumen">
+      <div><div class="etiqueta">Puertos</div><div class="valor">${r.grupos.length}</div></div>
+      <div><div class="etiqueta">Subidas</div><div class="valor">${r.subidas.length}</div></div>
+      <div><div class="etiqueta">Desnivel Rouvy</div><div class="valor">${Math.round(r.desnivelTotalM).toLocaleString('es-ES')} m</div></div>
+      <div><div class="etiqueta">Everest</div><div class="valor">${r.everest.toFixed(2).replace('.', ',')}</div></div>
+    </div>
+    <p class="hint" style="margin-top:6px;">🛂 Pasaporte: ${r.kmSubida.toFixed(1).replace('.', ',')} km de subida en ${r.sesionesVirtuales} ${r.sesionesVirtuales === 1 ? 'sesión' : 'sesiones'} de Rouvy. El Everest son ${PV_EVEREST_M.toLocaleString('es-ES')} m.</p>`;
+  let evol = '';
+  if (!r.hayPeso) evol = `<p class="hint" style="margin-top:8px;">Añade tu peso en Ajustes para ver tus vatios por kilo en subida.</p>`;
+  else if (r.evolucion.length >= 2) evol = `<div class="pv-sub">📈 Rendimiento en subida (mejor W/kg del mes)</div>${_svgEvolucionWkg(r.evolucion)}<p class="hint">Solo subidas de ${PV_MIN_SEG_WKG / 60} min o más. Ojo: una subida corta permite más W/kg que una larga, compara meses con puertos parecidos.</p>`;
+  else if (r.evolucion.length === 1) evol = `<div class="pv-sub">📈 Rendimiento en subida</div><p class="hint">Este mes tu mejor subida (≥${PV_MIN_SEG_WKG / 60} min) fue a <b>${r.evolucion[0].mejor.toFixed(2)} W/kg</b>. La evolución aparece a partir del segundo mes.</p>`;
+  const tarjetas = r.grupos.map((g, gi) => `
+    <div class="pv-card" data-g="${gi}">
+      <h4><span class="pv-nombre">⛰️ ${_escHtml(g.nombre)}</span><button class="del-btn pv-renombrar" data-g="${gi}" title="Cambiar nombre">✎</button></h4>
+      ${_svgPerfilPuerto(g.mejor.perfilRel)}
+      <div class="pv-stats">${(g.distM / 1000).toFixed(1)} km · ${g.desnivelM} m+ · ${g.pendienteMediaPct}% (máx ${g.pendienteMaxPct}%)<br>
+        ${g.intentos.length} ${g.intentos.length === 1 ? 'intento' : 'intentos'} · 🏆 ${_fmtMinSeg(g.mejor.tiempoSeg)} · ${g.mejor.pw ?? '—'} W${g.mejor.wkg != null ? ` · ${g.mejor.wkg.toFixed(2)} W/kg` : ''} · VAM ${g.mejor.vam}</div>
+      <div class="pv-detalle"></div>
+    </div>`).join('');
+  resEl.innerHTML = resumen + evol + avisoPerfil + (r.grupos.length ? tarjetas : `<p class="hint" style="margin-top:10px;">Aún no hay subidas detectadas (hace falta al menos 1 km y 50 m de desnivel al 3% o más).</p>`);
+}
+
+function renderPuertosVirtualesWidget() {
+  const el = document.getElementById('puertosVirtualesWidget');
+  if (!el || el.dataset.built) return;
+  el.dataset.built = '1';
+  el.innerHTML = `
+    <div class="card">
+      <h3>🏔️ Mis puertos (Rouvy) <span class="beta-tag">beta</span></h3>
+      <p class="hint">Cada subida de tus rutas de Rouvy, con tus intentos, tu mejor marca, la comparación kilómetro a kilómetro y un plan de ritmo. Los intentos se agrupan por la forma del perfil, así que da igual cómo se llame el fichero.</p>
+      <button class="primary-btn" id="calcularPuertosVirtualesBtn" style="margin-top:10px;">Calcular</button>
+      <div id="puertosVirtualesResultado" class="simulador-resultado"></div>
+    </div>`;
+  const resEl = document.getElementById('puertosVirtualesResultado');
+  document.getElementById('calcularPuertosVirtualesBtn').addEventListener('click', async (e) => {
+    const btn = e.target;
+    btn.disabled = true; btn.textContent = 'Calculando…'; resEl.innerHTML = '';
+    try {
+      _pvResultado = await calcularPuertosVirtuales(loadSesionesMeta());
+      _pintarPuertosVirtuales(resEl);
+    } catch (err) {
+      console.error(err);
+      resEl.innerHTML = `<p class="hint" style="color:var(--red);">Error: ${err.message}</p>`;
+    } finally { btn.disabled = false; btn.textContent = 'Calcular'; }
+  });
+
+  resEl.addEventListener('click', async (e) => {
+    if (!_pvResultado) return;
+    const ren = e.target.closest('.pv-renombrar');
+    if (ren) {
+      e.stopPropagation();
+      const g = _pvResultado.grupos[Number(ren.dataset.g)];
+      const h4 = ren.closest('h4');
+      h4.innerHTML = `<input type="text" class="pv-nombre-input" value="${_escHtml(g.nombre)}" style="flex:1; margin:0;"><button class="del-btn pv-guardar-nombre" data-g="${ren.dataset.g}">✓</button>`;
+      h4.querySelector('input').focus();
+      return;
+    }
+    const guardar = e.target.closest('.pv-guardar-nombre');
+    if (guardar) {
+      e.stopPropagation();
+      const gi = Number(guardar.dataset.g), g = _pvResultado.grupos[gi];
+      const nuevo = guardar.closest('h4').querySelector('input').value;
+      guardarNombrePuerto(g.clave, nuevo);
+      g.nombre = (nuevo && nuevo.trim()) || g.nombre;
+      guardar.closest('h4').innerHTML = `<span class="pv-nombre">⛰️ ${_escHtml(g.nombre)}</span><button class="del-btn pv-renombrar" data-g="${gi}" title="Cambiar nombre">✎</button>`;
+      return;
+    }
+    const planBtn = e.target.closest('.pv-plan-btn');
+    if (planBtn) {
+      e.stopPropagation();
+      const card = planBtn.closest('.pv-card'), out = card.querySelector('.pv-plan-res');
+      const g = _pvResultado.grupos[Number(planBtn.dataset.g)];
+      const pesoTotal = Number(card.querySelector('.pv-plan-peso').value) + Number(card.querySelector('.pv-plan-bici').value);
+      planBtn.disabled = true; planBtn.textContent = 'Calculando…';
+      try {
+        const plan = await calcularPlanRitmoPuerto(loadSesionesMeta(), g, pesoTotal);
+        if (!plan.disponible) { out.innerHTML = estadoVacioHtml(plan.motivo); return; }
+        const dif = plan.duracionSeg - plan.mejorRealSeg;
+        out.innerHTML = `<p class="hint" style="margin-top:8px;">Tiempo estimado <b>${_fmtMinSeg(plan.duracionSeg)}</b> a <b>${plan.potenciaMediaW} W</b> de media (confianza ${plan.confianza}). Tu mejor real: ${_fmtMinSeg(plan.mejorRealSeg)} (${dif > 0 ? 'el plan es ' + _fmtMinSeg(dif) + ' más lento' : dif < 0 ? 'el plan te haría ' + _fmtMinSeg(-dif) + ' más rápido' : 'igual'}).</p>
+          <table class="pv-tabla"><tr><th>Tramo</th><th>%</th><th>Vatios</th><th>Tiempo</th><th>Acum.</th></tr>${plan.filas.map(f => `<tr><td>km ${f.km}</td><td>${f.pendientePct}%</td><td><b>${f.vatios}</b></td><td>${_fmtMinSeg(f.tiempoSeg)}</td><td>${_fmtMinSeg(f.acumSeg)}</td></tr>`).join('')}</table>
+          <p class="hint" style="margin-top:6px; opacity:.75">Modelo CP≈${plan.modelo.CP} W, W'≈${(plan.modelo.Wprime / 1000).toFixed(1)} kJ, de tu curva de potencia. El tiempo real en Rouvy depende también del peso que tengas configurado allí.</p>`;
+      } catch (err) {
+        console.error(err); out.innerHTML = `<p class="hint" style="color:var(--red);">Error: ${err.message}</p>`;
+      } finally { planBtn.disabled = false; planBtn.textContent = 'Calcular plan'; }
+      return;
+    }
+    if (e.target.closest('.pv-detalle') || e.target.closest('select') || e.target.closest('input')) return;
+    const card = e.target.closest('.pv-card');
+    if (!card) return;
+    const det = card.querySelector('.pv-detalle');
+    if (!det.dataset.cargado) { det.innerHTML = _htmlDetallePuerto(_pvResultado.grupos[Number(card.dataset.g)], Number(card.dataset.g)); det.dataset.cargado = '1'; }
+    card.classList.toggle('open');
+  });
+  resEl.addEventListener('change', (e) => {
+    const sel = e.target.closest('.pv-sel-intento');
+    if (!sel || !_pvResultado) return;
+    const g = _pvResultado.grupos[Number(sel.dataset.g)];
+    sel.closest('.pv-detalle').querySelector('.pv-comparacion').innerHTML = _htmlComparacion(g, Number(sel.value));
+  });
+}
+
 // ---------- Completar tiempo de sesiones antiguas ----------
 document.getElementById('completarMeteoBtn').addEventListener('click', async (e) => {
   const btn = e.target;
@@ -13215,6 +13700,7 @@ document.getElementById('cerrarRegistroBtn').addEventListener('click', () => {
 renderSesiones();
 renderTramos();
 renderAnalisisGpx();
+renderPuertosVirtualesWidget();
 renderForma();
 renderHistorialDebriefs();
 renderEstadisticas();
