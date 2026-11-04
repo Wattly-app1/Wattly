@@ -415,6 +415,7 @@
 
   .pmc-svg{ width:100%; height:90px; display:block; margin-top:12px; }
   .pmc-chart-legend{ display:flex; gap:16px; margin-top:6px; font-size:11px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; flex-wrap:wrap; }
+  .comparador-tabla td.warn{ color:var(--amber); } .comparador-tabla td.up{ color:var(--teal); }
   .ct-disciplina{ font-family:'Space Grotesk',sans-serif; font-size:14px; margin:16px 0 4px; padding-top:12px; border-top:1px solid var(--surface-2); }
   .dot-legend{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:middle; }
 
@@ -625,6 +626,7 @@
       <div id="costeTermicoWidget"></div>
       <div id="cdaWidget"></div>
       <div id="pruebaFijaWidget"></div>
+      <div id="rodilloCalleWidget"></div>
     </div>
 
     <div class="tab-panel" id="panel-debrief">
@@ -2137,9 +2139,13 @@ function renderAnalisisGpx() {
                 ${correccion.aplicada ? `<p class="hint" style="margin-top:6px; color:var(--teal);">Corregido ${correccion.sesgoAplicadoPct > 0 ? '+' : ''}${correccion.sesgoAplicadoPct}% según tu histórico de calibración general (${correccion.n} comparaciones) — sin corregir: ${formatoDuracionHhMm(r.duracionMin)}.</p>` : ''}
                 <p class="hint" style="margin-top:6px;">Fatiga acumulada hasta este puerto: ~${r.kjAcumuladoRuta} kJ (${r.fraccionFatigaRutaPct}% de tu salida larga típica)${r.degradacionDisponible ? ` → potencia sostenible reducida un ${r.degradacionAplicadaPct}% respecto a fresco, según tu durability real.` : ' (sin durability calculable todavía para ajustar esto — asumido fresco).'}</p>
                 <p class="hint" style="margin-top:4px;">Modelo CP+W': CP≈${r.modeloCPW.CP}W, W'≈${(r.modeloCPW.Wprime/1000).toFixed(1)}kJ (R²=${r.modeloCPW.r2}). Potencia en llano de referencia: ${r.potLlano.potenciaW}W a ${r.potLlano.velocidadKmh}km/h (${r.potLlano.nMuestras} tramos tuyos). ${textoFisicaSimulador(r.fisica)}</p>
+                ${textoRodilloCalleEstimacion(r) ? `<p class="hint" style="margin-top:4px;">${textoRodilloCalleEstimacion(r)}</p>` : ''}
+                ${r.contextoPF ? `<p class="hint" style="margin-top:4px;">${textoContextoPruebaFija(r.contextoPF)}</p>` : ''}
+                <div class="gemelo-puerto" data-idx="${idx}"></div>
                 ${r.frescuraCorto?.obsoleta ? `<p class="hint" style="margin-top:4px; color:var(--amber);">⚠️ Tu último esfuerzo corto registrado (${r.frescuraCorto.duracionUltimoEsfuerzoCorto}) fue hace ${r.frescuraCorto.semanas} semanas — el W' de este modelo puede no reflejar tu capacidad anaeróbica actual.</p>` : ''}
                 ${r.frescuraDurability?.obsoleta ? `<p class="hint" style="margin-top:4px; color:var(--amber);">⚠️ Tu última sesión larga registrada fue hace ${r.frescuraDurability.semanas} semanas — la degradación por fatiga aplicada puede no reflejar tu resistencia actual.</p>` : ''}
               `;
+              pintarGemeloPuerto(resultadoEl.querySelector('.gemelo-puerto'), perfil, puertos[idx], duracionMostrada);
             }
           } catch (err) {
             console.error(err);
@@ -3248,6 +3254,120 @@ async function calcularPuertosVirtuales(sesiones) {
   };
 }
 
+// ---------- Gemelos: el mismo puerto en Rouvy y en la calle ----------
+// Las subidas de tus salidas de calle se detectan con el MISMO detector que
+// los puertos de Rouvy (mismo binning, mismo recorte al punto más bajo y
+// más alto) y se emparejan por la FORMA del perfil, con el mismo criterio
+// que agrupa tus intentos de Rouvy (longitud ±5%, desnivel parecido,
+// perfiles que se superponen). El nombre de la ruta no cuenta: Rouvy y tu
+// GPS no lo comparten.
+
+// Track de calle → el formato de distancia/altitud que usa el analizador de Rouvy
+function puntosCalleComoVirtuales(points) {
+  const pts = (points || []).filter(p => p.t != null && p.lat != null && p.lon != null && p.alt != null);
+  const salida = [];
+  let d = 0;
+  for (let i = 0; i < pts.length; i++) {
+    if (i > 0) d += haversine(pts[i - 1].lat, pts[i - 1].lon, pts[i].lat, pts[i].lon);
+    salida.push({ t: pts[i].t, vd: d, valt: pts[i].alt, pw: pts[i].pw, hr: pts[i].hr, cad: pts[i].cad });
+  }
+  return salida;
+}
+
+async function calcularSubidasCalle(sesiones) {
+  const calle = sesiones.filter(s => categoriaDisciplina(s.tipo) === 'cycling' && s.tiene_track && !s.es_interior);
+  const subidas = [];
+  for (const s of calle) {
+    try {
+      const tr = await getTrack(s.id);
+      subidas.push(...analizarSubidasVirtuales(s, puntosCalleComoVirtuales(tr?.points)).map(x => ({ ...x, entorno: 'calle', ruta: null })));
+    } catch (err) { console.error('Subidas de calle:', s.id, err); }
+  }
+  return subidas;
+}
+
+// Forma de un puerto de una ruta GPX, recortada igual que las de Rouvy, para buscarle gemelos
+function formaPuertoDePerfil(perfil, pt0) {
+  const B = perfil.bins;
+  let iMax = pt0.inicioIdx; for (let i = pt0.inicioIdx; i <= pt0.finIdx; i++) if (B[i].ele > B[iMax].ele) iMax = i;
+  let iMin = pt0.inicioIdx; for (let i = pt0.inicioIdx; i <= iMax; i++) if (B[i].ele < B[iMin].ele) iMin = i;
+  const base = B[iMin].ele;
+  return {
+    distM: Math.round(B[iMax].distM - B[iMin].distM),
+    desnivelM: Math.round(B[iMax].ele - base),
+    perfilRel: B.slice(iMin, iMax + 1).map(b => Math.round((b.ele - base) * 10) / 10)
+  };
+}
+
+// Núcleo puro: grupos de Rouvy y de calle → parejas del mismo puerto
+function emparejarGemelos(gruposVirtuales, gruposCalle) {
+  const parejas = [];
+  const usados = new Set();
+  for (const gv of gruposVirtuales) {
+    const gc = gruposCalle.find(g => !usados.has(g.clave) && mismoPuertoVirtual(gv.intentos[0], g.intentos[0]));
+    if (!gc) continue;
+    usados.add(gc.clave);
+    const v = gv.mejor, c = gc.mejor;
+    parejas.push({
+      nombre: gv.nombre,
+      distM: gv.distM, desnivelM: gv.desnivelM, pendienteMediaPct: gv.pendienteMediaPct,
+      rouvy: { fecha: v.fecha, tiempoSeg: v.tiempoSeg, pw: v.pw, hr: v.hr, wkg: v.wkg, intentos: gv.intentos.length },
+      calle: { fecha: c.fecha, tiempoSeg: c.tiempoSeg, pw: c.pw, hr: c.hr, wkg: c.wkg, intentos: gc.intentos.length },
+      // >1 = en la calle sacas más vatios en este mismo puerto
+      ratioPotencia: (v.pw && c.pw) ? Math.round(c.pw / v.pw * 1000) / 1000 : null,
+      difTiempoSeg: c.tiempoSeg - v.tiempoSeg
+    });
+  }
+  return parejas;
+}
+
+async function calcularGemelosRodilloCalle(sesiones) {
+  const virt = await calcularPuertosVirtuales(sesiones);
+  const subidasCalle = await calcularSubidasCalle(sesiones);
+  const gruposCalle = agruparPuertosVirtuales(subidasCalle);
+  return { parejas: emparejarGemelos(virt.grupos, gruposCalle), gruposVirtuales: virt.grupos, gruposCalle, nVirtuales: virt.grupos.length, nCalle: gruposCalle.length };
+}
+
+// ¿Este puerto de una ruta GPX ya lo has subido en Rouvy o en la calle?
+function buscarGemelosDePuerto(forma, gruposVirtuales, gruposCalle) {
+  return {
+    rouvy: gruposVirtuales.find(g => mismoPuertoVirtual(forma, g.intentos[0])) || null,
+    calle: gruposCalle.find(g => mismoPuertoVirtual(forma, g.intentos[0])) || null
+  };
+}
+
+// Se rellena después de mostrar la estimación, sin bloquearla (lee todas tus subidas)
+let _cacheGemelos = null;
+async function gemelosCacheados(sesiones) {
+  const clave = sesiones.length + '|' + sesiones.map(s => s.id).sort().slice(-3).join(',');
+  if (_cacheGemelos && _cacheGemelos.clave === clave) return _cacheGemelos.datos;
+  const datos = await calcularGemelosRodilloCalle(sesiones);
+  _cacheGemelos = { clave, datos };
+  return datos;
+}
+
+async function pintarGemeloPuerto(el, perfil, puerto, duracionEstimadaMin) {
+  if (!el) return;
+  el.innerHTML = '<p class="hint" style="margin-top:4px; opacity:.7">Buscando si ya has subido este puerto en Rouvy o en la calle…</p>';
+  try {
+    const g = await gemelosCacheados(loadSesionesMeta());
+    const { rouvy, calle } = buscarGemelosDePuerto(formaPuertoDePerfil(perfil, puerto), g.gruposVirtuales, g.gruposCalle);
+    if (!rouvy && !calle) { el.innerHTML = ''; return; }
+    const linea = (grupo, etiqueta) => {
+      const m = grupo.mejor;
+      const dif = Math.round(m.tiempoSeg / 60 - duracionEstimadaMin);
+      return `${etiqueta}: tu mejor fue <b>${formatoDuracionHhMm(m.tiempoSeg / 60)}</b> a ${m.pw ?? '—'} W (${m.fecha}, ${grupo.intentos.length} ${grupo.intentos.length === 1 ? 'intento' : 'intentos'}) — ${Math.abs(dif) < 1 ? 'casi igual que la estimación' : `${Math.abs(dif)} min ${dif > 0 ? 'más lento' : 'más rápido'} que la estimación`}.`;
+    };
+    const partes = [];
+    if (calle) partes.push(linea(calle, '⛰️ En la calle'));
+    if (rouvy) partes.push(linea(rouvy, '🏠 En Rouvy'));
+    el.innerHTML = `<p class="hint" style="margin-top:6px;">🔁 Ya conoces este puerto (mismo perfil). ${partes.join(' ')}${rouvy && !calle ? ' En Rouvy el tiempo depende de su propia física, así que compara mejor los vatios que el reloj.' : ''}</p>`;
+  } catch (err) {
+    console.error('Gemelos de puerto:', err);
+    el.innerHTML = '';
+  }
+}
+
 // Comparación kilómetro a kilómetro (y cada 100 m para la gráfica) entre dos intentos del mismo puerto.
 // diferencia > 0 = el intento "hoy" va POR DELANTE (ha tardado menos en llegar a ese punto)
 function compararIntentosPuerto(hoy, ref) {
@@ -3957,12 +4077,17 @@ const CP_LABELS_DISCIPLINA = {
   running: { emoji: '🏃', nombre: 'running', nombrePlural: 'de running', refCorta: 'CP running', refLarga: 'potencia crítica de running' }
 };
 
-async function calcularCurvaPotencia(sesiones, { disciplina = 'cycling', ventanaDias = null } = {}) {
+// entorno: null (todo) | 'interior' | 'exterior'. factorInterior: tu potencia
+// en rodillo ÷ en la calle (ver calcularFactorRodilloCalle); con un valor
+// distinto de 1 los esfuerzos de rodillo se convierten a su equivalente en la
+// calle antes de competir por el récord. Sin opciones, todo queda como antes.
+async function calcularCurvaPotencia(sesiones, { disciplina = 'cycling', ventanaDias = null, entorno = null, factorInterior = 1 } = {}) {
   const lbl = CP_LABELS_DISCIPLINA[disciplina] || CP_LABELS_DISCIPLINA.cycling;
   const limiteFecha = ventanaDias != null ? new Date(Date.now() - ventanaDias * 86400000) : null;
   const candidatas = sesiones
     .filter(s => categoriaDisciplina(s.tipo) === disciplina && s.tiene_track)
     .filter(s => !limiteFecha || new Date(s.fecha) >= limiteFecha)
+    .filter(s => entorno == null || (entorno === 'interior' ? !!s.es_interior : !s.es_interior))
     .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
 
   if (!candidatas.length) {
@@ -3990,10 +4115,11 @@ async function calcularCurvaPotencia(sesiones, { disciplina = 'cycling', ventana
           const val = mejorPotenciaEnTramo(tramo, d.seg);
           if (val != null && (mejorDeSesion == null || val > mejorDeSesion)) mejorDeSesion = val;
         }
+        if (mejorDeSesion != null && s.es_interior && factorInterior !== 1) mejorDeSesion = mejorDeSesion / factorInterior;
         if (mejorDeSesion != null) {
           algunaDuracionEncontrada = true;
           if (!records[d.seg] || mejorDeSesion > records[d.seg].valor) {
-            records[d.seg] = { valor: Math.round(mejorDeSesion), fecha: s.fecha };
+            records[d.seg] = { valor: Math.round(mejorDeSesion), fecha: s.fecha, ...(s.es_interior ? { interior: true } : {}) };
           }
           if (!porMes[mesKey]) porMes[mesKey] = {};
           if (!porMes[mesKey][d.seg] || mejorDeSesion > porMes[mesKey][d.seg]) porMes[mesKey][d.seg] = mejorDeSesion;
@@ -4783,6 +4909,109 @@ function calcularDegradacionDurability(durabilityResult, fraccionTrabajo) {
   return { ratio: Number((valorInterpolado / q1).toFixed(3)), disponible: true };
 }
 
+// ============================================================
+// RODILLO ↔ CALLE
+// Mucha gente rinde distinto en el rodillo que fuera (calor, sin inercia,
+// otra posición, motivación). La curva de potencia mezcla ambos, así que si
+// tus mejores 20 min son de Rouvy, el estimador de puertos los trata como si
+// pudieras repetirlos en la calle. Aquí se mide TU diferencia comparando tus
+// mejores esfuerzos en cada entorno en las mismas duraciones sostenidas, y
+// el estimador convierte los récords de rodillo a su equivalente de calle.
+// Honestidad:
+//  · Compara máximos: solo vale si has apretado de verdad en los dos sitios.
+//    Por eso exige al menos 2 duraciones con dato en ambos, que cuenten la
+//    misma historia (dispersión ≤ 8 puntos), y esfuerzos recientes (120 días).
+//  · Diferencias de menos de ±3% no se aplican: entran en el ruido normal.
+// ============================================================
+const RC_VENTANA_DIAS = 120;
+const RC_DURACIONES = [300, 600, 720, 1200, 2400];
+const RC_MIN_DURACIONES = 2;
+const RC_MAX_DISPERSION = 0.08;
+const RC_UMBRAL_APLICAR = 0.03;
+const RC_RANGO_PLAUSIBLE = [0.75, 1.15];
+
+function factorRodilloCalleDesdeCurvas(curvaInt, curvaExt) {
+  if (!curvaInt?.disponible || !curvaExt?.disponible) return null;
+  const val = (curva, seg) => (curva.records || []).find(r => r.seg === seg)?.valor ?? null;
+  const pares = [];
+  for (const seg of RC_DURACIONES) {
+    const i = val(curvaInt, seg), e = val(curvaExt, seg);
+    if (i != null && e != null && e > 0) pares.push({ seg, interior: i, exterior: e, ratio: i / e });
+  }
+  return pares;
+}
+
+async function calcularFactorRodilloCalle(sesiones) {
+  const [curvaInt, curvaExt] = await Promise.all([
+    calcularCurvaPotencia(sesiones, { disciplina: 'cycling', ventanaDias: RC_VENTANA_DIAS, entorno: 'interior' }),
+    calcularCurvaPotencia(sesiones, { disciplina: 'cycling', ventanaDias: RC_VENTANA_DIAS, entorno: 'exterior' })
+  ]);
+  if (!curvaInt.disponible) return { disponible: false, aplicar: false, motivo: `No tienes sesiones de rodillo con potencia en los últimos ${RC_VENTANA_DIAS} días.` };
+  if (!curvaExt.disponible) return { disponible: false, aplicar: false, motivo: `No tienes salidas en la calle con potencia en los últimos ${RC_VENTANA_DIAS} días.` };
+  return evaluarFactorRodilloCalle(factorRodilloCalleDesdeCurvas(curvaInt, curvaExt));
+}
+
+// Núcleo puro, testeable
+function evaluarFactorRodilloCalle(pares) {
+  if (!pares || pares.length < RC_MIN_DURACIONES) {
+    return { disponible: false, aplicar: false, pares: pares || [], motivo: `Hace falta tener esfuerzos de la misma duración (5, 10, 12, 20 o 40 min) en rodillo y en la calle en los últimos ${RC_VENTANA_DIAS} días: ahora coinciden ${pares ? pares.length : 0} (mínimo ${RC_MIN_DURACIONES}).` };
+  }
+  const ratios = pares.map(p => p.ratio).sort((a, b) => a - b);
+  const mitad = Math.floor(ratios.length / 2);
+  const factor = ratios.length % 2 ? ratios[mitad] : (ratios[mitad - 1] + ratios[mitad]) / 2;
+  const dispersion = ratios[ratios.length - 1] - ratios[0];
+  const coherente = dispersion <= RC_MAX_DISPERSION;
+  const plausible = factor >= RC_RANGO_PLAUSIBLE[0] && factor <= RC_RANGO_PLAUSIBLE[1];
+  const relevante = Math.abs(factor - 1) >= RC_UMBRAL_APLICAR;
+  return {
+    disponible: true,
+    factor: Math.round(factor * 1000) / 1000,
+    diferenciaPct: Math.round((factor - 1) * 1000) / 10,
+    pares: pares.map(p => ({ ...p, ratio: Math.round(p.ratio * 1000) / 1000 })),
+    dispersionPct: Math.round(dispersion * 1000) / 10,
+    coherente, plausible, relevante,
+    aplicar: coherente && plausible && relevante
+  };
+}
+
+// Contexto de la prueba fija de 150 W para una estimación: tu CP sale sobre
+// todo de tu récord sostenido más largo; ¿ha cambiado tu pulso a 150 W desde
+// entonces? Solo informa: no hay forma validada de convertir ppm en vatios.
+function contextoPruebaFija(sesiones, fechaRecord) {
+  if (!fechaRecord) return null;
+  const pruebas = sesiones.filter(s => s.prueba_fija && s.prueba_fija.fc_media != null)
+    .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
+  if (pruebas.length < 2) return null;
+  const antes = pruebas.filter(s => s.fecha <= fechaRecord);
+  const ref = antes.length ? antes[antes.length - 1] : null;
+  const ult = pruebas[pruebas.length - 1];
+  if (!ref || ref.id === ult.id) return null;
+  const delta = Math.round((ult.prueba_fija.fc_media - ref.prueba_fija.fc_media) * 10) / 10;
+  const cadDistinta = ref.prueba_fija.cadencia_media != null && ult.prueba_fija.cadencia_media != null
+    && Math.abs(ult.prueba_fija.cadencia_media - ref.prueba_fija.cadencia_media) > PRUEBA_FIJA_CADENCIA_DIFF;
+  return { fechaRecord, fechaRef: ref.fecha, fechaUlt: ult.fecha, fcRef: ref.prueba_fija.fc_media, fcUlt: ult.prueba_fija.fc_media, delta, cadDistinta };
+}
+
+function textoRodilloCalleEstimacion(r) {
+  const rc = r.rodilloCalle;
+  if (!r.nRecordsRodillo) return '';
+  const cuantos = `${r.nRecordsRodillo} de los ${r.nRecords} récords de tu curva de potencia son de rodillo`;
+  if (rc && rc.aplicar) {
+    return `🏠→⛰️ ${cuantos}: se han pasado a su equivalente en la calle con tu diferencia medida (en rodillo rindes un ${Math.abs(rc.diferenciaPct)}% ${rc.diferenciaPct < 0 ? 'menos' : 'más'}).`;
+  }
+  if (rc && rc.disponible && !rc.relevante) return `🏠 ${cuantos}; tu diferencia rodillo/calle es pequeña (${rc.diferenciaPct > 0 ? '+' : ''}${rc.diferenciaPct}%), así que se usan tal cual.`;
+  if (rc && rc.disponible) return `🏠 ${cuantos} y se usan tal cual: tu diferencia rodillo/calle (${rc.diferenciaPct > 0 ? '+' : ''}${rc.diferenciaPct}%) aún no es fiable${!rc.coherente ? ` (varía ${rc.dispersionPct} puntos según la duración)` : ' (fuera de lo razonable)'}.`;
+  return `🏠 ${cuantos} y se usan tal cual: no se ha podido medir tu diferencia rodillo/calle. ${rc?.motivo || ''}`;
+}
+
+function textoContextoPruebaFija(c) {
+  if (!c) return '';
+  const sentido = c.delta <= -2 ? `ha bajado <b>${Math.abs(c.delta)} ppm</b>: es probable que hoy rindas algo más de lo que dice el modelo`
+    : c.delta >= 2 ? `ha subido <b>${c.delta} ppm</b>: puede que hoy rindas algo menos (o que la última prueba pillara fatiga, calor o mal descanso)`
+    : `está prácticamente igual (${c.delta > 0 ? '+' : ''}${c.delta} ppm, dentro del ruido normal)`;
+  return `🧪 Tu CP sale sobre todo de tu récord del ${c.fechaRecord}. Desde la prueba de ${PRUEBA_FIJA_W} W más cercana a esa fecha (${c.fechaRef}) hasta la última (${c.fechaUlt}), tu pulso ${sentido}. Es contexto, no entra en el cálculo: no hay forma fiable de convertir pulsaciones en vatios.${c.cadDistinta ? ' ⚠️ Las dos pruebas se hicieron a cadencias distintas, así que la comparación es menos fiable.' : ''}`;
+}
+
 // --- Orquestador: estima el tiempo real de un puerto concreto de la ruta ---
 // Itera unas pocas veces porque la duración depende de la potencia y la
 // potencia depende de la duración (potencia sostenible cae cuanto más dura
@@ -4791,9 +5020,16 @@ async function estimarTiempoPuerto(sesiones, perfilRuta, puertos, puertoIdx, pes
   const potLlano = await conVentanaYFallback(calcularPotenciaLlanoHistorica, sesiones, {}, VENTANA_ESTIMACION_DIAS);
   if (!potLlano.disponible) return { disponible: false, motivo: potLlano.motivo };
 
-  const curva = await conVentanaYFallback(calcularCurvaPotencia, sesiones, { disciplina: 'cycling' }, VENTANA_ESTIMACION_DIAS);
+  // Tus récords de rodillo se pasan a su equivalente de calle si tu diferencia rodillo/calle es clara
+  const rodilloCalle = await calcularFactorRodilloCalle(sesiones);
+  const factorInterior = rodilloCalle.aplicar ? rodilloCalle.factor : 1;
+  const curva = await conVentanaYFallback(calcularCurvaPotencia, sesiones, { disciplina: 'cycling', factorInterior }, VENTANA_ESTIMACION_DIAS);
   if (!curva.disponible) return { disponible: false, motivo: 'Necesitas curva de potencia calculable en STATS antes de estimar tiempos de puerto.' };
   const modeloCPW = calcularModeloCPW(curva);
+  const conValor = (curva.records || []).filter(x => x.valor != null);
+  const recordLargo = conValor.length ? conValor[conValor.length - 1] : null; // el que más pesa en CP
+  const nRecordsRodillo = conValor.filter(x => x.interior).length;
+  const contextoPF = contextoPruebaFija(sesiones, recordLargo?.fecha);
   if (!modeloCPW.disponible) return { disponible: false, motivo: modeloCPW.motivo };
   const frescuraCorto = evaluarFrescuraEsfuerzosCortos(curva);
 
@@ -4837,6 +5073,7 @@ async function estimarTiempoPuerto(sesiones, perfilRuta, puertos, puertoIdx, pes
     frescuraDurability,
     potLlano,
     fisica,
+    rodilloCalle, nRecordsRodillo, nRecords: conValor.length, recordLargo, contextoPF,
     ventanaDiasUsada: curva.ventanaDiasUsada,
     usoFallbackSinVentana: curva.usoFallbackSinVentana || potLlano.usoFallbackSinVentana || durability.usoFallbackSinVentana
   };
@@ -12175,6 +12412,7 @@ function renderEstadisticas() {
     renderCosteTermicoWidget();
     renderCdAWidget();
     renderPruebaFijaWidget();
+    renderRodilloCalleWidget();
     return;
   }
 
@@ -12292,6 +12530,7 @@ function renderEstadisticas() {
   renderCosteTermicoWidget();
   renderCdAWidget();
   renderPruebaFijaWidget();
+  renderRodilloCalleWidget();
 }
 
 function renderVistaUnificadaWidget() {
@@ -13074,6 +13313,77 @@ function renderRespuestaCalorWidget() {
       resEl.innerHTML = `<p class="hint" style="color:var(--red);">Error: ${err.message}</p>`;
     } finally {
       btn.disabled = false; btn.textContent = 'Calcular';
+    }
+  });
+}
+
+// ---------- Rodillo ↔ calle (UI) ----------
+function _rcEtiquetaSeg(seg) { return (CP_DURACIONES.find(d => d.seg === seg) || { label: seg + ' s' }).label; }
+
+function htmlFactorRodilloCalle(rc) {
+  if (!rc.disponible) return estadoVacioHtml(rc.motivo);
+  const filas = rc.pares.map(p => {
+    const pct = Math.round((p.ratio - 1) * 1000) / 10;
+    return `<tr><td>${_rcEtiquetaSeg(p.seg)}</td><td style="color:var(--text)">${p.interior} W</td><td style="color:var(--text)">${p.exterior} W</td><td class="${Math.abs(pct) < 3 ? '' : pct < 0 ? 'warn' : 'up'}">${pct > 0 ? '+' : ''}${pct}%</td></tr>`;
+  }).join('');
+  let estado;
+  if (rc.aplicar) estado = `✅ Diferencia clara y coherente: el estimador de puertos convierte tus récords de rodillo a su equivalente en la calle (÷${rc.factor}).`;
+  else if (!rc.relevante) estado = `Diferencia pequeña (menos de ±${Math.round(RC_UMBRAL_APLICAR * 100)}%): rindes prácticamente igual en los dos sitios y los récords se usan tal cual.`;
+  else if (!rc.coherente) estado = `⏳ Las duraciones no cuentan la misma historia (varían ${rc.dispersionPct} puntos; máximo ${Math.round(RC_MAX_DISPERSION * 100)}): seguramente no apretaste igual en todos esos esfuerzos. No se aplica todavía.`;
+  else estado = `⚠️ La diferencia sale fuera de lo razonable (${rc.diferenciaPct}%). Revisa la calibración del rodillo o del potenciómetro; no se aplica.`;
+  return `
+    <div class="aclimatacion-delta">
+      <div class="valor ${rc.aplicar ? (rc.diferenciaPct < 0 ? 'warn' : 'up') : ''}">${rc.diferenciaPct > 0 ? '+' : ''}${rc.diferenciaPct}%</div>
+      <p class="hint">${rc.diferenciaPct < 0 ? 'menos' : 'más'} potencia en rodillo que en la calle (mediana de ${rc.pares.length} duraciones)</p>
+    </div>
+    <table class="comparador-tabla" style="width:100%; margin-top:8px;">
+      <thead><tr><th>Mejor</th><th>Rodillo</th><th>Calle</th><th>Dif.</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <p class="hint" style="margin-top:8px;">${estado}</p>
+    <p class="hint" style="margin-top:4px; opacity:.75">Compara tus MEJORES esfuerzos de cada duración en los últimos ${RC_VENTANA_DIAS} días: solo es justo si has apretado de verdad en los dos sitios. Un test de 20 min en Rouvy y un puerto a tope en la calle son la mejor pareja.</p>`;
+}
+
+function htmlGemelos(g) {
+  if (!g.parejas.length) {
+    return estadoVacioHtml(`Ninguno de tus ${g.nVirtuales} puertos de Rouvy coincide en perfil con alguna de tus ${g.nCalle} subidas de calle. Cuando subas en la calle un puerto que hayas hecho en Rouvy (o al revés), aparecerá aquí con los dos lado a lado.`);
+  }
+  return g.parejas.map(p => {
+    const dif = p.ratioPotencia != null ? Math.round((p.ratioPotencia - 1) * 1000) / 10 : null;
+    return `<div class="record-item" style="flex-direction:column; align-items:stretch; gap:4px;">
+      <span class="record-label"><b>${p.nombre}</b> <span class="hint">${(p.distM / 1000).toFixed(1).replace('.', ',')} km · ${p.desnivelM} m · ${String(p.pendienteMediaPct).replace('.', ',')}%</span></span>
+      <span class="hint">🏠 Rouvy: ${formatoDuracionHhMm(p.rouvy.tiempoSeg / 60)} · ${p.rouvy.pw ?? '—'} W · ${p.rouvy.hr ?? '—'} ppm <span style="opacity:.6">(${p.rouvy.fecha})</span></span>
+      <span class="hint">⛰️ Calle: ${formatoDuracionHhMm(p.calle.tiempoSeg / 60)} · ${p.calle.pw ?? '—'} W · ${p.calle.hr ?? '—'} ppm <span style="opacity:.6">(${p.calle.fecha})</span></span>
+      ${dif != null ? `<span class="hint">En la calle moviste un <b>${dif > 0 ? '+' : ''}${dif}%</b> de vatios en este mismo puerto.</span>` : ''}
+    </div>`;
+  }).join('') + `<p class="hint" style="margin-top:6px; opacity:.75">Mismo perfil (longitud ±${Math.round(PV_TOL_DIST * 100)}%, desnivel parecido y forma superpuesta). Compara vatios y pulso más que tiempo: en Rouvy la velocidad la pone su propia física, y en la calle mandan el viento y el asfalto.</p>`;
+}
+
+function renderRodilloCalleWidget() {
+  const el = document.getElementById('rodilloCalleWidget');
+  if (!el || el.dataset.built) return;
+  el.dataset.built = '1';
+  el.innerHTML = `
+    <div class="card">
+      <h3>🏠⛰️ Rodillo ↔ calle <span class="beta-tag">beta</span></h3>
+      <p class="hint">Cuánto rindes en el rodillo frente a la calle, y los puertos que has subido en los dos sitios. Si la diferencia es clara, el estimador de puertos deja de tratar tus récords de Rouvy como si fueran de la calle.</p>
+      <button class="primary-btn" id="calcularRodilloCalleBtn" style="margin-top:10px;">Calcular</button>
+      <div id="rodilloCalleResultado" class="simulador-resultado"></div>
+    </div>`;
+  document.getElementById('calcularRodilloCalleBtn').addEventListener('click', async (e) => {
+    const btn = e.target, resEl = document.getElementById('rodilloCalleResultado');
+    btn.disabled = true; btn.textContent = 'Calculando… (lee todas tus salidas)'; resEl.innerHTML = '';
+    try {
+      const sesiones = loadSesionesMeta();
+      const rc = await calcularFactorRodilloCalle(sesiones);
+      const g = await gemelosCacheados(sesiones);
+      resEl.innerHTML = `<h4 class="ct-disciplina">Potencia: rodillo frente a calle</h4>${htmlFactorRodilloCalle(rc)}
+        <h4 class="ct-disciplina">Puertos gemelos</h4>${htmlGemelos(g)}`;
+    } catch (err) {
+      console.error(err);
+      resEl.innerHTML = `<p class="hint" style="color:var(--red);">Error: ${err.message}</p>`;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Recalcular';
     }
   });
 }
