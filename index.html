@@ -623,6 +623,7 @@
       <div id="aclimatacionWidget"></div>
       <div id="respuestaCalorWidget"></div>
       <div id="costeTermicoWidget"></div>
+      <div id="cdaWidget"></div>
       <div id="pruebaFijaWidget"></div>
     </div>
 
@@ -2077,7 +2078,7 @@ function renderAnalisisGpx() {
               </div>
               ${correccion.aplicada ? `<p class="hint" style="margin-top:6px; color:var(--teal);">Corregido ${correccion.sesgoAplicadoPct > 0 ? '+' : ''}${correccion.sesgoAplicadoPct}% según tu histórico de calibración ${correccion.origen === 'terreno' ? `en terreno ${terreno}` : 'general'} (${correccion.n} comparaciones) — sin corregir: ${formatoDuracionHhMm(r.tiempoTotalMin)}.</p>` : ''}
               <p class="hint" style="margin-top:8px;">${r.kjReferenciaDisponible ? `Esta ruta te va a costar ~${r.fraccionFatigaPct}% de lo que gastas en una salida larga típica tuya — el ${r.margenPct}% restante es tu margen respecto a tu tolerancia habitual, no una reserva de energía real medida.` : 'Sin referencia de kJ típico todavía (hace falta más historial de salidas largas) — el margen de energía no se puede calcular, el resto de números sí son válidos.'}</p>
-              <p class="hint" style="margin-top:4px;">Subida: ${r.kjSubidaTotal}kJ a ${r.potSubida.potenciaW}W de crucero · Llano: ${r.kjLlanoTotal}kJ a ${r.potLlano.potenciaW}W · Bajada: sin trabajo mecánico contabilizado (aproximación).</p>
+              <p class="hint" style="margin-top:4px;">Subida: ${r.kjSubidaTotal}kJ a ${r.potSubida.potenciaW}W de crucero · Llano: ${r.kjLlanoTotal}kJ a ${r.potLlano.potenciaW}W · Bajada: sin trabajo mecánico contabilizado (aproximación). ${textoFisicaSimulador(r.fisica)}</p>
               ${r.cubosAproximados.length ? `<p class="hint" style="margin-top:4px; color:var(--amber);">⚠️ Sin muestra propia en bajadas ${r.cubosAproximados.join(' ni ')} — se usó la velocidad del cubo más cercano que sí tenías, menos fiable en esos tramos.</p>` : ''}
             `;
           }
@@ -2135,7 +2136,7 @@ function renderAnalisisGpx() {
                 </div>
                 ${correccion.aplicada ? `<p class="hint" style="margin-top:6px; color:var(--teal);">Corregido ${correccion.sesgoAplicadoPct > 0 ? '+' : ''}${correccion.sesgoAplicadoPct}% según tu histórico de calibración general (${correccion.n} comparaciones) — sin corregir: ${formatoDuracionHhMm(r.duracionMin)}.</p>` : ''}
                 <p class="hint" style="margin-top:6px;">Fatiga acumulada hasta este puerto: ~${r.kjAcumuladoRuta} kJ (${r.fraccionFatigaRutaPct}% de tu salida larga típica)${r.degradacionDisponible ? ` → potencia sostenible reducida un ${r.degradacionAplicadaPct}% respecto a fresco, según tu durability real.` : ' (sin durability calculable todavía para ajustar esto — asumido fresco).'}</p>
-                <p class="hint" style="margin-top:4px;">Modelo CP+W': CP≈${r.modeloCPW.CP}W, W'≈${(r.modeloCPW.Wprime/1000).toFixed(1)}kJ (R²=${r.modeloCPW.r2}). Potencia en llano de referencia: ${r.potLlano.potenciaW}W a ${r.potLlano.velocidadKmh}km/h (${r.potLlano.nMuestras} tramos tuyos). Física con Crr=${FISICA_CRR}, CdA=${FISICA_CDA} (valores por defecto, no ajustados a viento/posición real del día).</p>
+                <p class="hint" style="margin-top:4px;">Modelo CP+W': CP≈${r.modeloCPW.CP}W, W'≈${(r.modeloCPW.Wprime/1000).toFixed(1)}kJ (R²=${r.modeloCPW.r2}). Potencia en llano de referencia: ${r.potLlano.potenciaW}W a ${r.potLlano.velocidadKmh}km/h (${r.potLlano.nMuestras} tramos tuyos). ${textoFisicaSimulador(r.fisica)}</p>
                 ${r.frescuraCorto?.obsoleta ? `<p class="hint" style="margin-top:4px; color:var(--amber);">⚠️ Tu último esfuerzo corto registrado (${r.frescuraCorto.duracionUltimoEsfuerzoCorto}) fue hace ${r.frescuraCorto.semanas} semanas — el W' de este modelo puede no reflejar tu capacidad anaeróbica actual.</p>` : ''}
                 ${r.frescuraDurability?.obsoleta ? `<p class="hint" style="margin-top:4px; color:var(--amber);">⚠️ Tu última sesión larga registrada fue hace ${r.frescuraDurability.semanas} semanas — la degradación por fatiga aplicada puede no reflejar tu resistencia actual.</p>` : ''}
               `;
@@ -2333,11 +2334,23 @@ function loadCalibracionPredicciones() {
 }
 function saveCalibracionPredicciones(lista) { localStorage.setItem(LS_CALIBRACION_KEY, JSON.stringify(lista)); }
 
-function registrarCalibracionPrediccion(sesionId, rutaId, rutaNombre, errorTiempoPct, errorCaloriasPct, terreno = null, tsbBucket = null) {
+function registrarCalibracionPrediccion(sesionId, rutaId, rutaNombre, errorTiempoPct, errorCaloriasPct, terreno = null, tsbBucket = null, fisica = null) {
   if (errorTiempoPct == null) return; // sin duración real no hay nada que calibrar
   const lista = loadCalibracionPredicciones().filter(c => c.sesionId !== sesionId); // recalcular sustituye, no duplica
-  lista.push({ sesionId, rutaId, rutaNombre, fecha: fechaLocalStr(new Date()), errorTiempoPct, errorCaloriasPct, terreno, tsbBucket });
+  const f = fisica || FISICA_LIBRO;
+  lista.push({ sesionId, rutaId, rutaNombre, fecha: fechaLocalStr(new Date()), errorTiempoPct, errorCaloriasPct, terreno, tsbBucket, fisica: { cda: f.cda, crr: f.crr } });
   saveCalibracionPredicciones(lista);
+}
+
+// El sesgo medido con una física (p. ej. CdA de libro) no vale para corregir
+// predicciones hechas con otra (tu CdA): si se mezclaran, la corrección
+// "arreglaría" un error que el modelo ya no comete. Las entradas antiguas,
+// sin etiqueta, se hicieron con la física de libro.
+const CALIBRACION_TOL_CDA = 0.02;
+const CALIBRACION_TOL_CRR = 0.001;
+function calibracionCompatibleConFisica(entrada, fisica) {
+  const e = entrada.fisica || FISICA_LIBRO;
+  return Math.abs(e.cda - fisica.cda) <= CALIBRACION_TOL_CDA && Math.abs(e.crr - fisica.crr) <= CALIBRACION_TOL_CRR;
 }
 
 const CALIBRACION_MIN_MUESTRAS_GRUPO = 5;
@@ -2357,8 +2370,11 @@ function resumenCalibracionDeLista(lista) {
 // antes de que existieran estas etiquetas (terreno/tsbBucket = null) siguen
 // contando para el global, simplemente no entran en los desgloses.
 function calcularResumenCalibracion() {
-  const lista = loadCalibracionPredicciones().sort((a, b) => b.fecha.localeCompare(a.fecha));
-  if (!lista.length) return { disponible: false, n: 0 };
+  const fisica = fisicaVigente();
+  const todas = loadCalibracionPredicciones();
+  const lista = todas.filter(c => calibracionCompatibleConFisica(c, fisica)).sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const nOtraFisica = todas.length - lista.length;
+  if (!lista.length) return { disponible: false, n: 0, nOtraFisica };
   const global = resumenCalibracionDeLista(lista);
 
   const porTerreno = {};
@@ -2380,7 +2396,8 @@ function calcularResumenCalibracion() {
     errorAbsMedioPct: global.errorAbsMedioPct,
     porTerreno: Object.keys(porTerreno).length ? porTerreno : null,
     porFatiga: Object.keys(porFatiga).length ? porFatiga : null,
-    ultimas: lista.slice(0, 8)
+    ultimas: lista.slice(0, 8),
+    nOtraFisica
   };
 }
 
@@ -3284,7 +3301,7 @@ async function calcularPlanRitmoPuerto(sesiones, grupo, pesoTotalKg) {
     for (const k of kms) {
       const factor = Math.max(1 - PV_PLAN_MAX_VARIACION, Math.min(1 + PV_PLAN_MAX_VARIACION, 1 + PV_PLAN_FACTOR_PENDIENTE * (k.pendientePct - gMedia)));
       const w = Math.round(P * factor);
-      const t = k.distM / velocidadParaPotencia(w, pesoTotalKg, k.pendientePct);
+      const t = k.distM / velocidadParaPotencia(w, pesoTotalKg, k.pendientePct, null, FISICA_LIBRO); // Rouvy: puerto virtual, la física real de la calle no aplica
       tTotal += t;
       filas.push({ ...k, vatios: w, tiempoSeg: Math.round(t), acumSeg: Math.round(tTotal) });
     }
@@ -4365,27 +4382,311 @@ function potenciaEstimadaDuracion(modeloCPW, segundos) {
 // P = (Crr·m·g·cosθ + m·g·senθ + 0.5·ρ·CdA·v²)·v / eficiencia
 // Para las pendientes de un puerto (≥3%), cosθ≈1 sin apenas error, así que
 // se simplifica. Constantes por defecto de literatura de ciclismo (asfalto,
-// posición en las palancas) — no son configurables todavía, y eso es una
-// limitación real: viento y posición cambian esto bastante.
+// posición en las palancas). Cuando tu CdA/Crr estimados con tus propias
+// salidas son fiables (ver "TU CdA REAL" abajo), sustituyen a estas.
 const FISICA_CRR = 0.005;
 const FISICA_CDA = 0.32;
 const FISICA_RHO = 1.225;
 const FISICA_EFICIENCIA = 0.975;
+const FISICA_LIBRO = { cda: FISICA_CDA, crr: FISICA_CRR, personal: false };
 
-function velocidadParaPotencia(potenciaW, pesoTotalKg, pendientePct) {
+// Densidad del aire a una altitud y temperatura (atmósfera estándar para la
+// presión; la humedad cambia ρ menos de un 1% y se ignora).
+function rhoAire(altitudM, tempC = 15) {
+  const p = 101325 * Math.pow(1 - 2.25577e-5 * Math.max(-400, altitudM), 5.25588);
+  return p / (287.05 * (tempC + 273.15));
+}
+
+// fisica: { cda, crr, personal }. Con la física de libro todo queda como
+// estaba (ρ a nivel del mar). Con tu CdA, ρ se calcula a la altitud del
+// tramo, porque tu CdA se estimó con el ρ real de cada salida: mezclar tu
+// CdA con el ρ del nivel del mar sobrestimaría la resistencia en Salamanca
+// (~800 m) un 9%.
+function velocidadParaPotencia(potenciaW, pesoTotalKg, pendientePct, altitudM = null, fisica = null) {
+  const f = fisica || fisicaVigente();
+  const rho = f.rho != null ? f.rho : (f.personal && altitudM != null ? rhoAire(altitudM) : FISICA_RHO);
   const g = 9.81;
   const senTheta = pendientePct / 100;
   const potenciaNeta = Math.max(0, potenciaW) * FISICA_EFICIENCIA;
-  const a = FISICA_CRR * pesoTotalKg * g + pesoTotalKg * g * senTheta;
-  const b = 0.5 * FISICA_RHO * FISICA_CDA;
-  const f = (v) => a * v + b * v ** 3 - potenciaNeta;
+  const a = f.crr * pesoTotalKg * g + pesoTotalKg * g * senTheta;
+  const b = 0.5 * rho * f.cda;
+  const fn = (v) => a * v + b * v ** 3 - potenciaNeta;
   let lo = 0, hi = 30;
-  if (f(hi) < 0) hi = 60;
+  if (fn(hi) < 0) hi = 60;
   for (let i = 0; i < 60; i++) {
     const mid = (lo + hi) / 2;
-    if (f(mid) > 0) hi = mid; else lo = mid;
+    if (fn(mid) > 0) hi = mid; else lo = mid;
   }
   return (lo + hi) / 2; // m/s
+}
+
+// ============================================================
+// TU CdA REAL (aerodinámica y rodadura estimadas con tus salidas)
+// Balance de potencias por tramo de 60 s, sin suposiciones de libro:
+//   P·η − m·g·Δh/Δt − ½·m·Δ(v²)/Δt = Crr·m·g·v̄ + CdA·½·ρ·(v + k·w)²·v
+// · Gravedad e inercia se RESTAN con tu peso (cuerpo en esa fecha + bici)
+//   y la altitud/velocidad reales: así sirven también tramos con algo de
+//   pendiente, no solo el llano perfecto.
+// · w = viento de Open-Meteo proyectado sobre tu rumbo (+ de cara).
+//   k = fracción de ese viento a 10 m que te llega a la altura del manillar.
+//   No se supone: se ajusta con tus datos (rejilla 0–1). Si tus datos no
+//   permiten fijarlo, se usa 0,6 (perfil de viento en campo abierto) y la UI
+//   lo dice.
+// · ρ real de cada salida: altitud media del track y temperatura de Open-Meteo.
+// · Regresión por el origen (sin término independiente: la física no lo
+//   tiene), limpieza de atípicos a 3σ robusta, e incertidumbre por bootstrap
+//   de SESIONES (los tramos de una misma salida no son independientes).
+// ============================================================
+const LS_CDA_KEY = 'em_cda_personal';
+const LS_CDA_BICI = 'em_cda_bici';
+const LS_CDA_USAR = 'em_cda_usar_en_simulador';
+const CDA_VENTANA_SEG = 60;
+const CDA_VEL_MIN_MS = 5;            // por debajo el aire apenas pesa y el tramo no informa del CdA
+const CDA_PENDIENTE_MAX_PCT = 4;
+const CDA_RECTITUD_MIN = 0.85;       // desplazamiento / recorrido: tramos con curvas cerradas no tienen un rumbo único
+const CDA_MAX_CEROS = 0.10;
+const CDA_MIN_SESIONES = 8;
+const CDA_MIN_TRAMOS = 150;
+const CDA_MIN_SD_VAIRE_MS = 1.5;     // sin variedad de velocidad de aire no se separan rodadura y aerodinámica (con 1,0 un caso de prueba llano daba un CdA un 15% falso con IC estrecho)
+const CDA_K_SUPUESTO = 0.6;
+const CDA_K_IC_MAX_ANCHO = 0.6;
+const CDA_IC_MAX_REL = 0.10;         // semiancho del IC del CdA ≤ 10% de su valor para usarlo
+const CDA_RANGO = [0.15, 0.55];
+const CRR_RANGO = [0.002, 0.012];
+const CDA_BOOTSTRAP = 200;
+// Comprobación cruzada contra el error del viento de Open-Meteo: el CdA de
+// tus días de poco viento (donde ese error apenas pesa) debe coincidir con
+// el global. Si el viento previsto se equivoca mucho, el global se sesga y
+// el bootstrap no lo ve (es un sesgo sistemático, no ruido).
+const CDA_CALMA_MAX_MS = 10 / 3.6;
+const CDA_CALMA_MIN_SESIONES = 4;
+const CDA_CALMA_TOL_REL = 0.08;
+
+function _cdaMedia(a) { return a.reduce((x, y) => x + y, 0) / a.length; }
+
+function tramosBalanceCdA(points, { masaKg, rho, vientoMs, vientoDir }) {
+  const pts = (points || []).filter(p => p.t != null);
+  const tramos = [];
+  let i = 0;
+  while (i < pts.length) {
+    const desde = pts[i].t;
+    const grupo = [pts[i]];
+    let j = i + 1, hueco = false;
+    while (j < pts.length && (pts[j].t - desde) / 1000 < CDA_VENTANA_SEG) {
+      if ((pts[j].t - pts[j - 1].t) / 1000 > CP_GAP_MAX_SEG) { hueco = true; break; }
+      grupo.push(pts[j]); j++;
+    }
+    if (j >= pts.length) break;
+    i = j;
+    if (hueco) continue;
+    const t = evaluarTramoCdA(grupo, masaKg, rho, vientoMs, vientoDir);
+    if (t) tramos.push(t);
+  }
+  return tramos;
+}
+
+function evaluarTramoCdA(grupo, m, rho, vientoMs, vientoDir) {
+  const n = grupo.length;
+  if (n < 10) return null;
+  const dt = (grupo[n - 1].t - grupo[0].t) / 1000;
+  if (dt < CDA_VENTANA_SEG * 0.8) return null;
+  if (grupo.some(p => p.pw == null || p.spd == null || p.lat == null || p.lon == null || p.alt == null)) return null;
+  if (grupo.filter(p => p.pw <= 0).length > n * CDA_MAX_CEROS) return null;
+  const vs = grupo.map(p => p.spd);
+  const v1 = _cdaMedia(vs);
+  if (v1 < CDA_VEL_MIN_MS) return null;
+  let recorrido = 0;
+  for (let k = 1; k < n; k++) recorrido += haversine(grupo[k - 1].lat, grupo[k - 1].lon, grupo[k].lat, grupo[k].lon);
+  if (recorrido < 50) return null;
+  const desplazamiento = haversine(grupo[0].lat, grupo[0].lon, grupo[n - 1].lat, grupo[n - 1].lon);
+  if (desplazamiento / recorrido < CDA_RECTITUD_MIN) return null;
+  const extremo = (arr, campo) => _cdaMedia(arr.map(p => p[campo]));
+  const ini = grupo.slice(0, 3), fin = grupo.slice(-3);
+  const dh = extremo(fin, 'alt') - extremo(ini, 'alt');
+  if (Math.abs(dh / recorrido * 100) > CDA_PENDIENTE_MAX_PCT) return null;
+  const vIni = extremo(ini, 'spd'), vFin = extremo(fin, 'spd');
+  // Δh y Δv van entre los CENTROS de los dos grupos de 3 puntos, así que se
+  // dividen por el tiempo entre esos centros, no por la duración del tramo:
+  // con la duración entera la gravedad quedaba un ~3% sin restar, y como en
+  // subida vas más lento y en bajada más rápido, ese resto se colaba como
+  // "más rodadura y menos aire" (lo destapó el banco de pruebas sintético).
+  const dtCentros = (extremo(fin, 't') - extremo(ini, 't')) / 1000;
+  if (dtCentros <= 0) return null;
+  const g = 9.81;
+  const y = _cdaMedia(grupo.map(p => p.pw)) * FISICA_EFICIENCIA
+    - m * g * dh / dtCentros
+    - 0.5 * m * (vFin * vFin - vIni * vIni) / dtCentros;
+  const rumbo = _rumbo(grupo[0].lat, grupo[0].lon, grupo[n - 1].lat, grupo[n - 1].lon);
+  const w = vientoMs * Math.cos((vientoDir - rumbo) * Math.PI / 180); // + de cara
+  return {
+    y,
+    xRod: m * g * v1,
+    // aire con factor k: ½ρ·mean((v + k·w)²·v) = ½ρ·(S3 + 2kw·S2 + k²w²·S1)
+    s1: v1, s2: _cdaMedia(vs.map(v => v * v)), s3: _cdaMedia(vs.map(v => v * v * v)),
+    w, rho, vientoMs
+  };
+}
+
+function _xAire(t, k) { return 0.5 * t.rho * (t.s3 + 2 * k * t.w * t.s2 + k * k * t.w * t.w * t.s1); }
+
+// Mínimos cuadrados por el origen con 2 columnas
+function _cdaAjusteK(tramos, k) {
+  let a11 = 0, a12 = 0, a22 = 0, b1 = 0, b2 = 0;
+  for (const t of tramos) {
+    const x1 = t.xRod, x2 = _xAire(t, k);
+    a11 += x1 * x1; a12 += x1 * x2; a22 += x2 * x2; b1 += x1 * t.y; b2 += x2 * t.y;
+  }
+  const det = a11 * a22 - a12 * a12;
+  if (Math.abs(det) < 1e-9) return null;
+  const crr = (b1 * a22 - b2 * a12) / det;
+  const cda = (a11 * b2 - a12 * b1) / det;
+  let sse = 0;
+  for (const t of tramos) sse += (t.y - crr * t.xRod - cda * _xAire(t, k)) ** 2;
+  return { crr, cda, k, sse };
+}
+
+function _cdaMejorK(tramos, kFijo = null) {
+  if (kFijo != null) return _cdaAjusteK(tramos, kFijo);
+  let mejor = null;
+  for (let k = 0; k <= 1.0001; k += 0.05) {
+    const r = _cdaAjusteK(tramos, Math.round(k * 100) / 100);
+    if (r && (!mejor || r.sse < mejor.sse)) mejor = r;
+  }
+  return mejor;
+}
+
+// Núcleo puro: porSesion = [{ id, fecha, tramos: [...] }]
+function modeloCdA(porSesion) {
+  const base = { calculado: fechaLocalStr(new Date()) };
+  const sesionesUtiles = porSesion.filter(s => s.tramos.length >= 3);
+  const todos = sesionesUtiles.flatMap(s => s.tramos.map(t => ({ ...t, sid: s.id })));
+  if (sesionesUtiles.length < CDA_MIN_SESIONES || todos.length < CDA_MIN_TRAMOS) {
+    return { ...base, disponible: false, motivo: `Hay ${sesionesUtiles.length} salidas y ${todos.length} tramos útiles (1 min, rectos, a más de ${Math.round(CDA_VEL_MIN_MS * 3.6)} km/h, pedaleando, con viento y temperatura reales). Hacen falta al menos ${CDA_MIN_SESIONES} salidas y ${CDA_MIN_TRAMOS} tramos.` };
+  }
+  const vAire = todos.map(t => t.s1 + CDA_K_SUPUESTO * t.w);
+  const mV = _cdaMedia(vAire);
+  const sdV = Math.sqrt(_cdaMedia(vAire.map(v => (v - mV) ** 2)));
+  if (sdV < CDA_MIN_SD_VAIRE_MS) {
+    return { ...base, disponible: false, motivo: `Tus tramos útiles tienen casi siempre la misma velocidad de aire (±${sdV.toFixed(1)} m/s). Para separar rodadura y aerodinámica hace falta más variedad: rodajes suaves y a tope, días con viento de cara y a favor.` };
+  }
+  // limpieza de atípicos (paradas a medio tramo, rebufo de grupo, picos de potencia…)
+  let ajuste = _cdaMejorK(todos);
+  if (!ajuste) return { ...base, disponible: false, motivo: 'No se pudo ajustar el modelo con estos tramos.' };
+  const res = todos.map(t => t.y - ajuste.crr * t.xRod - ajuste.cda * _xAire(t, ajuste.k));
+  const medAbs = res.map(Math.abs).sort((a, b) => a - b)[Math.floor(res.length / 2)];
+  const sigmaRob = 1.4826 * medAbs;
+  const limpios = todos.filter((t, i) => Math.abs(res[i]) <= 3 * sigmaRob);
+  const descartados = todos.length - limpios.length;
+  ajuste = _cdaMejorK(limpios);
+
+  const ids = [...new Set(limpios.map(t => t.sid))];
+  const porId = {};
+  limpios.forEach(t => { (porId[t.sid] = porId[t.sid] || []).push(t); });
+  const bootstrap = (kFijo) => {
+    let s = ids.length * 2654435761 >>> 0;
+    const rnd = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const cdas = [], crrs = [], ks = [];
+    for (let b = 0; b < CDA_BOOTSTRAP; b++) {
+      const muestra = [];
+      for (let i = 0; i < ids.length; i++) muestra.push(...porId[ids[Math.floor(rnd() * ids.length)]]);
+      const r = _cdaMejorK(muestra, kFijo);
+      if (r) { cdas.push(r.cda); crrs.push(r.crr); ks.push(r.k); }
+    }
+    const pc = (arr, p) => { const o = arr.slice().sort((a, b) => a - b); return o[Math.min(o.length - 1, Math.max(0, Math.round((o.length - 1) * p)))]; };
+    return { icCdA: [pc(cdas, 0.025), pc(cdas, 0.975)], icCrr: [pc(crrs, 0.025), pc(crrs, 0.975)], icK: [pc(ks, 0.025), pc(ks, 0.975)] };
+  };
+  let ic = bootstrap(null);
+  let kSupuesto = false;
+  if (ic.icK[1] - ic.icK[0] > CDA_K_IC_MAX_ANCHO) {
+    kSupuesto = true;
+    ajuste = _cdaMejorK(limpios, CDA_K_SUPUESTO);
+    ic = bootstrap(CDA_K_SUPUESTO);
+  }
+  const plausible = ajuste.cda >= CDA_RANGO[0] && ajuste.cda <= CDA_RANGO[1] && ajuste.crr >= CRR_RANGO[0] && ajuste.crr <= CRR_RANGO[1];
+  const semiancho = (ic.icCdA[1] - ic.icCdA[0]) / 2;
+  const calma = limpios.filter(t => t.vientoMs <= CDA_CALMA_MAX_MS);
+  const nCalma = new Set(calma.map(t => t.sid)).size;
+  let cdaCalma = null, coherenteConCalma = null;
+  if (nCalma >= CDA_CALMA_MIN_SESIONES) {
+    const rc = _cdaAjusteK(calma, ajuste.k);
+    if (rc) { cdaCalma = rc.cda; coherenteConCalma = Math.abs(rc.cda - ajuste.cda) <= CDA_CALMA_TOL_REL * ajuste.cda; }
+  }
+  const fiable = plausible && semiancho <= CDA_IC_MAX_REL * ajuste.cda && coherenteConCalma !== false;
+  const r3 = v => Math.round(v * 1000) / 1000, r4 = v => Math.round(v * 10000) / 10000;
+  const rmse = Math.sqrt(_cdaMejorK(limpios, ajuste.k).sse / limpios.length);
+  return {
+    ...base,
+    disponible: true,
+    cda: r3(ajuste.cda), crr: r4(ajuste.crr), k: Math.round(ajuste.k * 100) / 100,
+    icCdA: ic.icCdA.map(r3), icCrr: ic.icCrr.map(r4), icK: kSupuesto ? null : ic.icK.map(v => Math.round(v * 100) / 100),
+    kSupuesto, plausible, fiable,
+    cdaCalma: cdaCalma != null ? r3(cdaCalma) : null, nCalma, coherenteConCalma,
+    nSesiones: ids.length, nTramos: limpios.length, descartados,
+    rmseW: Math.round(rmse),
+    masaMedia: Math.round(_cdaMedia(limpios.map(t => t.xRod / (9.81 * t.s1)))),
+    // muestra de tramos para dibujar tu curva de resistencia (fuerza frente a velocidad del aire)
+    puntos: limpios.filter((t, i) => i % Math.max(1, Math.ceil(limpios.length / 300)) === 0)
+      .map(t => ({ v: Math.round((t.s1 + ajuste.k * t.w) * 100) / 100, f: Math.round(t.y / t.s1 * 10) / 10 })),
+    // CdA·ρ local vs libro: cuánto cambia la resistencia del aire en tu altitud habitual
+    rhoMedio: r3(_cdaMedia(limpios.map(t => t.rho)))
+  };
+}
+
+function loadCdA() { try { return JSON.parse(localStorage.getItem(LS_CDA_KEY) || 'null'); } catch { return null; } }
+function guardarCdA(r) { localStorage.setItem(LS_CDA_KEY, JSON.stringify(r)); }
+function usarCdAEnSimulador() { return localStorage.getItem(LS_CDA_USAR) !== '0'; }
+
+// Física que usan simulador y puertos ahora mismo: la tuya si es fiable y
+// tienes el interruptor activado; la de libro si no.
+function fisicaVigente() {
+  const r = loadCdA();
+  if (r && r.disponible && r.fiable && usarCdAEnSimulador()) return { cda: r.cda, crr: r.crr, personal: true };
+  return FISICA_LIBRO;
+}
+
+function textoFisicaSimulador(fisica) {
+  const f = fisica || FISICA_LIBRO;
+  return f.personal
+    ? `Física con <b>tu</b> CdA=${f.cda} y Crr=${f.crr} (estimados con tus salidas) y densidad del aire a la altitud del tramo.`
+    : `Física con Crr=${FISICA_CRR}, CdA=${FISICA_CDA} (valores de libro; tu CdA real aún no es fiable o lo tienes desactivado — Stats → Tu CdA real).`;
+}
+
+// Peso de la bici para el cálculo: la elegida en el widget, o la única que haya
+function biciParaCdA() {
+  const bicis = loadBicis().filter(b => b.kg > 0);
+  if (!bicis.length) return null;
+  const elegida = localStorage.getItem(LS_CDA_BICI);
+  return bicis.find(b => b.id === elegida) || (bicis.length === 1 ? bicis[0] : null);
+}
+
+async function calcularCdA(sesiones) {
+  const bici = biciParaCdA();
+  if (!bici) {
+    const hay = loadBicis().filter(b => b.kg > 0).length;
+    return { disponible: false, motivo: hay ? 'Elige con qué bici sales fuera (arriba) para poder restar la gravedad y la inercia.' : 'Guarda el peso de tu bici en Ajustes: hace falta para restar la gravedad y la inercia de cada tramo.' };
+  }
+  if (!loadPesos().some(p => p.kg > 0)) {
+    return { disponible: false, motivo: 'Guarda tu peso corporal en Ajustes: hace falta para restar la gravedad y la inercia de cada tramo.' };
+  }
+  const candidatas = sesiones.filter(s => categoriaDisciplina(s.tipo) === 'cycling' && s.tiene_track && !s.es_interior
+    && s.meteo && s.meteo.viento_kmh != null && s.meteo.viento_dir != null && s.meteo.temp_c != null);
+  const sinMeteo = sesiones.filter(s => categoriaDisciplina(s.tipo) === 'cycling' && s.tiene_track && !s.es_interior && !s.meteo).length;
+  const porSesion = [];
+  for (const s of candidatas) {
+    try {
+      const tr = await getTrack(s.id);
+      const pts = tr?.points || [];
+      const alts = pts.map(p => p.alt).filter(a => a != null);
+      if (!alts.length) continue;
+      const masaKg = pesoCorporalEnFecha(s.fecha) + bici.kg;
+      const rho = rhoAire(_cdaMedia(alts), s.meteo.temp_c);
+      porSesion.push({ id: s.id, fecha: s.fecha, tramos: tramosBalanceCdA(pts, { masaKg, rho, vientoMs: s.meteo.viento_kmh / 3.6, vientoDir: s.meteo.viento_dir }) });
+    } catch (err) { console.error('CdA:', s.id, err); }
+  }
+  const r = modeloCdA(porSesion);
+  r.bici = bici.nombre;
+  r.sinMeteo = sinMeteo;
+  return r;
 }
 
 // --- Fatiga acumulada dentro de la propia ruta ---
@@ -4508,11 +4809,14 @@ async function estimarTiempoPuerto(sesiones, perfilRuta, puertos, puertoIdx, pes
 
   let duracionEstimadaSeg = (puerto.distanciaKm / 15) * 3600; // arranque razonable: 15km/h
   let potenciaFinalW = null, confianzaFinal = null;
+  const fisica = fisicaVigente();
+  const binsPuerto = perfilRuta.bins.slice(puerto.inicioIdx, puerto.finIdx + 1);
+  const altitudPuertoM = binsPuerto.length ? binsPuerto.reduce((a, b) => a + b.ele, 0) / binsPuerto.length : null;
   for (let iter = 0; iter < 8; iter++) {
     const base = potenciaEstimadaDuracion(modeloCPW, duracionEstimadaSeg);
     potenciaFinalW = Math.round(base.potenciaW * degradacion.ratio);
     confianzaFinal = base.confianza;
-    const vMs = velocidadParaPotencia(potenciaFinalW, pesoTotalKg, puerto.pendienteMediaPct);
+    const vMs = velocidadParaPotencia(potenciaFinalW, pesoTotalKg, puerto.pendienteMediaPct, altitudPuertoM, fisica);
     const nuevaDuracionSeg = (puerto.distanciaKm * 1000) / vMs;
     if (Math.abs(nuevaDuracionSeg - duracionEstimadaSeg) < 5) { duracionEstimadaSeg = nuevaDuracionSeg; break; }
     duracionEstimadaSeg = nuevaDuracionSeg;
@@ -4532,6 +4836,7 @@ async function estimarTiempoPuerto(sesiones, perfilRuta, puertos, puertoIdx, pes
     frescuraCorto,
     frescuraDurability,
     potLlano,
+    fisica,
     ventanaDiasUsada: curva.ventanaDiasUsada,
     usoFallbackSinVentana: curva.usoFallbackSinVentana || potLlano.usoFallbackSinVentana || durability.usoFallbackSinVentana
   };
@@ -4562,6 +4867,7 @@ async function simularRutaCompleta(sesiones, perfil, pesoTotalKg) {
   if (kjRef == null) kjRef = await calcularKjTotalMedioSesionesLargas(sesiones);
 
   const bins = perfil.bins;
+  const fisica = fisicaVigente();
   let kjAcumulado = 0;
   let tiempoTotalSeg = 0;
   let kjSubidaTotal = 0, kjLlanoTotal = 0;
@@ -4575,7 +4881,7 @@ async function simularRutaCompleta(sesiones, perfil, pesoTotalKg) {
       const fraccion = kjRef ? kjAcumulado / kjRef : 0;
       const degradacion = calcularDegradacionDurability(durability, fraccion);
       potenciaBinW = potSubida.potenciaW * degradacion.ratio;
-      velocidadMs = velocidadParaPotencia(potenciaBinW, pesoTotalKg, pendiente);
+      velocidadMs = velocidadParaPotencia(potenciaBinW, pesoTotalKg, pendiente, bins[i].ele, fisica);
       kjSubidaTotal += (potenciaBinW * (PERFIL_BIN_METROS / velocidadMs)) / 1000;
     } else if (pendiente <= -3) {
       velocidadMs = obtenerVelocidadBajadaPorPendiente(velBajada, pendiente) / 3.6;
@@ -4584,7 +4890,7 @@ async function simularRutaCompleta(sesiones, perfil, pesoTotalKg) {
       const fraccion = kjRef ? kjAcumulado / kjRef : 0;
       const degradacion = calcularDegradacionDurability(durability, fraccion);
       potenciaBinW = potLlano.potenciaW * degradacion.ratio;
-      velocidadMs = velocidadParaPotencia(potenciaBinW, pesoTotalKg, pendiente);
+      velocidadMs = velocidadParaPotencia(potenciaBinW, pesoTotalKg, pendiente, bins[i].ele, fisica);
       kjLlanoTotal += (potenciaBinW * (PERFIL_BIN_METROS / velocidadMs)) / 1000;
     }
 
@@ -4615,6 +4921,7 @@ async function simularRutaCompleta(sesiones, perfil, pesoTotalKg) {
     cubosAproximados,
     serieTiempoAcumuladoMin,
     frescuraDurability,
+    fisica,
     ventanaDiasUsada: potLlano.ventanaDiasUsada,
     usoFallbackSinVentana: potLlano.usoFallbackSinVentana || potSubida.usoFallbackSinVentana || velBajada.usoFallbackSinVentana || durability.usoFallbackSinVentana
   };
@@ -10367,7 +10674,7 @@ function renderSesiones() {
                 } else {
                   localStorage.setItem('em_ultimo_peso_pred', pesoSel);
                   localStorage.setItem('em_ultimo_bici_pred', biciSel);
-                  registrarCalibracionPrediccion(sesionActual.id, rutaCoincidente.id, rutaCoincidente.nombre, r.errorTiempoPct, r.errorCaloriasPct, r.terreno, r.tsbBucket);
+                  registrarCalibracionPrediccion(sesionActual.id, rutaCoincidente.id, rutaCoincidente.nombre, r.errorTiempoPct, r.errorCaloriasPct, r.terreno, r.tsbBucket, r.prediccion.fisica);
                   resEl.innerHTML = `
                     <div class="pmc-grid" style="margin-top:8px;">
                       <div><span class="label">Tiempo predicho</span><span class="val">${formatoDuracionHhMm(r.prediccion.tiempoTotalMin)}</span></div>
@@ -10488,6 +10795,7 @@ async function renderTramos() {
         🏆 Mejor marca: ${formatoMinutos(mejorMarca.duracionMin)} (${formatoRitmo(mejorMarca.ritmo)}) · ${mejorMarca.fecha}
         ${mejorMarca.esNueva ? ' — ¡nueva marca en tu última salida! 🎉' : ''}
       </p>
+      ${notaVientoMejorMarca(mejorMarca, sesionesDelTramo)}
     ` : '';
 
     // Comparativa: última salida vs. media de las salidas anteriores en el
@@ -11865,6 +12173,7 @@ function renderEstadisticas() {
     renderAclimatacionWidget();
     renderRespuestaCalorWidget();
     renderCosteTermicoWidget();
+    renderCdAWidget();
     renderPruebaFijaWidget();
     return;
   }
@@ -11981,6 +12290,7 @@ function renderEstadisticas() {
   renderAclimatacionWidget();
   renderRespuestaCalorWidget();
   renderCosteTermicoWidget();
+  renderCdAWidget();
   renderPruebaFijaWidget();
 }
 
@@ -12222,7 +12532,9 @@ function renderCalibracionWidget() {
     el.innerHTML = `
       <div class="card">
         <h3>🎯 Precisión de tus estimaciones</h3>
-        ${estadoVacioHtml('Todavía no tienes ninguna comparación registrada. Cuando una sesión de bici coincida con una ruta guardada (en Registro, dentro del detalle de la sesión), puedes comparar el tiempo predicho contra el real — cada comparación se guarda aquí para que veas si el modelo tiende a acertar, quedarse corto o pasarse.')}
+        ${estadoVacioHtml(r.nOtraFisica
+          ? `Tus ${r.nOtraFisica} comparaciones anteriores se hicieron con otra física (${fisicaVigente().personal ? 'el CdA de libro' : 'tu CdA personal'}) y no sirven para medir el modelo actual. Vuelve a comparar salidas en Registro y el histórico se irá llenando con la física nueva.`
+          : 'Todavía no tienes ninguna comparación registrada. Cuando una sesión de bici coincida con una ruta guardada (en Registro, dentro del detalle de la sesión), puedes comparar el tiempo predicho contra el real — cada comparación se guarda aquí para que veas si el modelo tiende a acertar, quedarse corto o pasarse.')}
       </div>
     `;
     return;
@@ -12267,7 +12579,7 @@ function renderCalibracionWidget() {
   el.innerHTML = `
     <div class="card">
       <h3>🎯 Precisión de tus estimaciones</h3>
-      <p class="hint">Basado en ${r.n} ${r.n === 1 ? 'comparación' : 'comparaciones'} entre lo que el modelo predijo y lo que de verdad hiciste.</p>
+      <p class="hint">Basado en ${r.n} ${r.n === 1 ? 'comparación' : 'comparaciones'} entre lo que el modelo predijo y lo que de verdad hiciste${r.nOtraFisica ? ` (otras ${r.nOtraFisica}, hechas con ${fisicaVigente().personal ? 'el CdA de libro' : 'tu CdA personal'}, no cuentan: medían otro modelo)` : ''}.</p>
       <div class="pmc-grid" style="margin-top:8px;">
         <div><span class="label">Sesgo medio</span><span class="val ${claseSesgo}">${r.sesgoMedioPct > 0 ? '+' : ''}${r.sesgoMedioPct}%</span></div>
         <div><span class="label">Error absoluto medio</span><span class="val">${r.errorAbsMedioPct}%</span></div>
@@ -12764,6 +13076,156 @@ function renderRespuestaCalorWidget() {
       btn.disabled = false; btn.textContent = 'Calcular';
     }
   });
+}
+
+// ---------- Tu CdA real (UI) ----------
+function generarSvgCurvaResistencia(r) {
+  const pts = r.puntos || [];
+  if (pts.length < 10) return '';
+  const W = 320, H = 170, mL = 32, mR = 8, mT = 10, mB = 22;
+  const g = 9.81;
+  const curva = (v, cda, crr) => crr * r.masaMedia * g + 0.5 * r.rhoMedio * cda * v * v;
+  const vs = pts.map(p => p.v), fs = pts.map(p => p.f);
+  const x0 = Math.max(0, Math.floor(Math.min(...vs))), x1 = Math.ceil(Math.max(...vs));
+  const fMax = Math.max(...fs, curva(x1, r.cda, r.crr), curva(x1, FISICA_CDA, FISICA_CRR));
+  const y0 = Math.min(0, Math.floor(Math.min(...fs) / 10) * 10), y1 = Math.ceil(fMax / 10) * 10;
+  const sx = v => mL + (v - x0) / Math.max(1e-6, x1 - x0) * (W - mL - mR);
+  const sy = f => H - mB - (f - y0) / Math.max(1e-6, y1 - y0) * (H - mT - mB);
+  const linea = (cda, crr) => {
+    const p = [];
+    for (let i = 0; i <= 30; i++) { const v = x0 + (x1 - x0) * i / 30; p.push(`${sx(v).toFixed(1)},${sy(curva(v, cda, crr)).toFixed(1)}`); }
+    return p.join(' ');
+  };
+  let s = `<line x1="${mL}" y1="${H - mB}" x2="${W - mR}" y2="${H - mB}" stroke="var(--line)" />`;
+  for (let v = Math.ceil(x0 / 2) * 2; v <= x1; v += 2) {
+    s += `<text x="${sx(v).toFixed(1)}" y="${H - 7}" text-anchor="middle" font-size="9" fill="var(--text-dim)" font-family="JetBrains Mono, monospace">${Math.round(v * 3.6)}</text>`;
+  }
+  [Math.round(y1 / 2 / 10) * 10, y1].forEach(f => {
+    s += `<line x1="${mL}" y1="${sy(f).toFixed(1)}" x2="${W - mR}" y2="${sy(f).toFixed(1)}" stroke="var(--surface-2)" />`;
+    s += `<text x="${mL - 4}" y="${(sy(f) + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-dim)" font-family="JetBrains Mono, monospace">${f} N</text>`;
+  });
+  s += pts.map(p => `<circle cx="${sx(p.v).toFixed(1)}" cy="${sy(p.f).toFixed(1)}" r="1.8" fill="var(--teal)" opacity="0.45" />`).join('');
+  s += `<polyline points="${linea(FISICA_CDA, FISICA_CRR)}" fill="none" stroke="var(--text-dim)" stroke-width="1.5" stroke-dasharray="4 3" />`;
+  s += `<polyline points="${linea(r.cda, r.crr)}" fill="none" stroke="var(--amber)" stroke-width="2" />`;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; display:block; margin-top:10px;" role="img" aria-label="Fuerza de resistencia frente a velocidad del aire">${s}</svg>
+    <div class="pmc-chart-legend">
+      <span><span class="dot-legend" style="background:var(--teal)"></span>tramos de 1 min</span>
+      <span><span class="dot-legend" style="background:var(--amber)"></span>tu curva</span>
+      <span><span class="dot-legend" style="background:var(--text-dim)"></span>libro</span>
+      <span>eje: km/h de aire</span>
+    </div>`;
+}
+
+function htmlResultadoCdA(r) {
+  if (!r) return '';
+  if (!r.disponible) {
+    return estadoVacioHtml(r.motivo + (r.sinMeteo ? ` ${r.sinMeteo} salidas en bici aún no tienen tiempo real (Ajustes → Completar tiempo).` : ''));
+  }
+  // traducción tangible: velocidad en llano a 200 W con tu física vs la de libro, a tu ρ habitual
+  const P = 200, m = r.masaMedia;
+  const vTuya = velocidadParaPotencia(P, m, 0, null, { cda: r.cda, crr: r.crr, rho: r.rhoMedio });
+  const vLibro = velocidadParaPotencia(P, m, 0, null, { cda: FISICA_CDA, crr: FISICA_CRR, rho: r.rhoMedio });
+  const difKmh = ((vTuya - vLibro) * 3.6).toFixed(1);
+  const clase = r.fiable ? 'up' : 'warn';
+  let estado;
+  if (r.fiable) {
+    estado = `<p class="hint" style="margin-top:8px;">✅ Fiable: el simulador de puertos y rutas puede usarlo.</p>
+      <label class="hint" style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+        <input type="checkbox" id="cdaUsarCheck" ${usarCdAEnSimulador() ? 'checked' : ''}> Usar mi CdA en simulaciones y puertos
+      </label>
+      <p class="hint" style="margin-top:4px; opacity:.75">Al cambiar de física, tu histórico de precisión empieza de nuevo: el sesgo medido con el CdA de libro no sirve para corregir predicciones hechas con el tuyo.</p>`;
+  } else if (r.plausible && r.coherenteConCalma === false) {
+    estado = `<p class="hint" style="margin-top:8px;">⚠️ Tu CdA de los días con poco viento (${r.cdaCalma}, ${r.nCalma} salidas) no cuadra con el de todas tus salidas (${r.cda}): señal de que el viento de Open-Meteo se aleja del que te encuentras de verdad. El simulador sigue con el CdA de libro hasta que cuadren.</p>`;
+  } else if (!r.plausible) {
+    estado = `<p class="hint" style="margin-top:8px;">⚠️ Salen valores fuera de lo físicamente razonable (CdA ${CDA_RANGO[0]}–${CDA_RANGO[1]}, Crr ${CRR_RANGO[0]}–${CRR_RANGO[1]}). Suele deberse a salidas a rueda en grupo, a un potenciómetro descalibrado o a un peso guardado que no es el actual. El simulador sigue con el CdA de libro.</p>`;
+  } else {
+    estado = `<p class="hint" style="margin-top:8px;">⏳ Aún impreciso (el intervalo es más ancho que ±${Math.round(CDA_IC_MAX_REL * 100)}%). El simulador sigue con el CdA de libro hasta que tengas más salidas variadas.</p>`;
+  }
+  const kTxt = r.kSupuesto
+    ? `supuesto ${CDA_K_SUPUESTO} (tus datos no permiten medirlo; perfil de viento de campo abierto)`
+    : `${r.k} <span style="opacity:.6">(${r.icK[0]}–${r.icK[1]})</span>`;
+  return `
+    <div class="aclimatacion-delta">
+      <div class="valor ${clase}">CdA ${r.cda}</div>
+      <p class="hint">IC 95%: ${r.icCdA[0]}–${r.icCdA[1]} m² · libro: ${FISICA_CDA} m²</p>
+    </div>
+    <div class="pmc-grid" style="margin-top:8px;">
+      <div><span class="label">Crr</span><span class="val">${r.crr}</span></div>
+      <div><span class="label">Viento que te llega</span><span class="val">${r.kSupuesto ? CDA_K_SUPUESTO + '*' : Math.round(r.k * 100) + '%'}</span></div>
+      <div><span class="label">Densidad del aire</span><span class="val">${r.rhoMedio} <span style="font-size:11px; opacity:.7">kg/m³</span></span></div>
+      <div><span class="label">A 200 W en llano</span><span class="val">${(vTuya * 3.6).toFixed(1)} km/h</span></div>
+    </div>
+    ${generarSvgCurvaResistencia(r)}
+    <p class="hint" style="margin-top:8px;">A 200 W en llano y sin viento irías a ${(vTuya * 3.6).toFixed(1)} km/h con tu física, frente a ${(vLibro * 3.6).toFixed(1)} km/h con la de libro (${difKmh > 0 ? '+' : ''}${difKmh} km/h), con el aire de tu zona.</p>
+    ${estado}
+    <p class="hint" style="margin-top:4px; opacity:.75">${r.nSesiones} salidas, ${r.nTramos} tramos de 1 min (${r.descartados} atípicos descartados), bici ${r.bici}, error típico ${r.rmseW} W por tramo. Crr IC ${r.icCrr[0]}–${r.icCrr[1]}. Fracción del viento de Open-Meteo (a 10 m) que te llega: ${kTxt}.${r.cdaCalma != null ? ` Comprobación con días de poco viento: CdA ${r.cdaCalma} (${r.nCalma} salidas).` : ` Sin días de poco viento suficientes (${r.nCalma ?? 0} de ${CDA_CALMA_MIN_SESIONES}) para la comprobación cruzada.`} Es un CdA medio de tus salidas: cambia con la postura, la ropa y si vas a rueda — las salidas en grupo lo bajan. Calculado el ${r.calculado}.</p>`;
+}
+
+function renderCdAWidget() {
+  const el = document.getElementById('cdaWidget');
+  if (!el || el.dataset.built) return;
+  el.dataset.built = '1';
+  const bicis = loadBicis().filter(b => b.kg > 0);
+  const elegida = biciParaCdA();
+  const selectorBici = bicis.length > 1 ? `
+      <label class="hint" style="display:block; margin-top:8px;">Bici con la que sales fuera:
+        <select id="cdaBiciSelect" style="margin-left:6px;">
+          <option value="">— elige —</option>
+          ${bicis.map(b => `<option value="${b.id}" ${elegida && elegida.id === b.id ? 'selected' : ''}>${b.nombre} (${b.kg} kg)</option>`).join('')}
+        </select>
+      </label>` : '';
+  el.innerHTML = `
+    <div class="card">
+      <h3>🌬️ Tu CdA real <span class="beta-tag">beta</span></h3>
+      <p class="hint">Tu resistencia aerodinámica (CdA) y de rodadura (Crr) medidas con tus propias salidas: potencia, velocidad, desnivel, tu peso y el viento y la temperatura reales de cada día. Cuando es fiable, sustituye a los valores de libro en el simulador de puertos y rutas.</p>
+      ${selectorBici}
+      <button class="primary-btn" id="calcularCdABtn" style="margin-top:10px;">${loadCdA() ? 'Recalcular' : 'Calcular'}</button>
+      <div id="cdaResultado" class="simulador-resultado"></div>
+    </div>`;
+  const resEl = document.getElementById('cdaResultado');
+  const pintar = () => {
+    resEl.innerHTML = htmlResultadoCdA(loadCdA());
+    const chk = document.getElementById('cdaUsarCheck');
+    if (chk) chk.addEventListener('change', () => {
+      localStorage.setItem(LS_CDA_USAR, chk.checked ? '1' : '0');
+      renderCalibracionWidget();
+    });
+  };
+  pintar();
+  const sel = document.getElementById('cdaBiciSelect');
+  if (sel) sel.addEventListener('change', () => localStorage.setItem(LS_CDA_BICI, sel.value));
+  document.getElementById('calcularCdABtn').addEventListener('click', async (e) => {
+    const btn = e.target;
+    btn.disabled = true; btn.textContent = 'Calculando… (lee todas tus salidas)';
+    try {
+      const r = await calcularCdA(loadSesionesMeta());
+      if (r.disponible) guardarCdA(r);
+      else if (!loadCdA()?.disponible) guardarCdA(r);
+      pintar();
+      if (!r.disponible && loadCdA()?.disponible) resEl.insertAdjacentHTML('afterbegin', `<p class="hint" style="color:var(--amber);">No se pudo recalcular: ${r.motivo} Se mantiene el resultado anterior.</p>`);
+      renderCalibracionWidget();
+    } catch (err) {
+      console.error(err);
+      resEl.innerHTML = `<p class="hint" style="color:var(--red);">Error: ${err.message}</p>`;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Recalcular';
+    }
+  });
+}
+
+// Mejor marca de un tramo en bici conseguida con bastante más viento a favor
+// que tus otras salidas por ese mismo tramo: se marca, no se anula.
+function notaVientoMejorMarca(mejorMarca, sesionesDelTramo) {
+  if (!mejorMarca) return '';
+  const mejor = sesionesDelTramo.find(s => s.id === mejorMarca.sesionId);
+  const netoMejor = mejor?.meteo?.viento_rel?.neto_kmh;
+  if (netoMejor == null) return '';
+  const otros = sesionesDelTramo.filter(s => s.id !== mejor.id).map(s => s.meteo?.viento_rel?.neto_kmh).filter(v => v != null).sort((a, b) => a - b);
+  if (otros.length < 2) return '';
+  const mediana = otros[Math.floor(otros.length / 2)];
+  const ayuda = Math.round((mediana - netoMejor) * 10) / 10; // + = más a favor (o menos de cara) que lo habitual
+  if (ayuda < VIENTO_DIFF_COMPARABLE_KMH) return '';
+  return `<p class="hint" style="margin-top:2px;">💨* Esa marca tuvo ${ayuda} km/h más de viento a favor que tus otras ${otros.length} salidas por aquí (viento neto sobre tu marcha, Open-Meteo). Sigue siendo tu marca; el asterisco es para que sepas con qué la comparas.</p>`;
 }
 
 // ---------- Tu coste térmico (UI) ----------
