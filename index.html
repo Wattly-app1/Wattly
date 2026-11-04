@@ -622,6 +622,7 @@
 
     <div class="tab-panel" id="panel-estadisticas">
       <div class="section-divider"><span class="dot"></span> Cómo voy</div>
+      <div id="rioTemporadaWidget"></div>
       <div id="vistaUnificadaWidget"></div>
       <div id="statsWidget"></div>
 
@@ -629,7 +630,6 @@
         <summary><span class="dot"></span> Qué ha cambiado</summary>
         <div id="quecambioWidget"></div>
         <div id="comparadorMesesWidget"></div>
-        <div id="rioTemporadaWidget"></div>
         <div id="vo2maxTendenciaWidget"></div>
         <div id="vamWidget"></div>
         <div id="balanceAerobicoWidget"></div>
@@ -12426,10 +12426,10 @@ document.getElementById('generarWrappedBtn').addEventListener('click', generarWr
 // Orden = orden visual de la pestaña. Un widget nuevo de Stats se añade
 // aquí y en el HTML del panel; no hay segunda lista que mantener.
 function renderWidgetsEstadisticas() {
+  renderRioTemporadaWidget();
   renderVistaUnificadaWidget();
   renderQueCambioWidget();
   renderComparadorMesesWidget();
-  renderRioTemporadaWidget();
   renderVamWidget();
   renderBalanceAerobicoWidget();
   renderCurvaPotenciaWidget();
