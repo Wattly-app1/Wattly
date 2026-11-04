@@ -561,7 +561,7 @@
 
   /* ---------- Río de temporada (streamgraph) ---------- */
   .rio-svg{ width:100%; height:auto; margin-top:10px; display:block; cursor:pointer; }
-  .rio-rango{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim); margin:-2px 0 6px; }
+  .rio-rango{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim); margin:8px 0 6px; }
   .rio-meses{ position:relative; height:30px; margin-top:4px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--text-dim); }
   .rio-meses span{ position:absolute; top:0; padding-left:3px; white-space:nowrap; line-height:1.3; }
   .rio-meses b{ display:block; font-weight:400; font-size:9.5px; opacity:.7; }
@@ -12050,12 +12050,20 @@ const LABEL_PERIODO = { semana: 'esta semana', mes: 'este mes', año: 'este año
 
 const CATEGORIAS_RIO = ['running', 'cycling', 'gym', 'otros'];
 
-function calcularRioTemporada(sesiones) {
+// Ventana del río: últimos 12 o 24 meses. Más atrás el río se comprime
+// tanto en el móvil que deja de aportar.
+let rioVentanaMeses = 12;
+
+function calcularRioTemporada(sesiones, meses = rioVentanaMeses) {
   if (!sesiones.length) return { disponible: false, motivo: null };
+
+  const desde = new Date(); desde.setMonth(desde.getMonth() - meses);
+  const semanaDesde = fechaLocalStr(inicioPeriodo('semana', desde));
 
   const porSemana = new Map();
   sesiones.forEach(s => {
     const inicioSemana = fechaLocalStr(inicioPeriodo('semana', new Date(s.fecha + 'T00:00:00')));
+    if (inicioSemana < semanaDesde) return;
     if (!porSemana.has(inicioSemana)) {
       const tss = {}; CATEGORIAS_RIO.forEach(c => tss[c] = 0);
       porSemana.set(inicioSemana, { tss, dolores: [] });
@@ -12070,6 +12078,7 @@ function calcularRioTemporada(sesiones) {
   // río llega hasta la semana actual. Sin esto, las marcas de mes caerían
   // en sitios falsos.
   const claves = [...porSemana.keys()].sort();
+  if (claves.length < 3) return { disponible: false, motivo: `Hacen falta al menos 3 semanas con sesiones en los últimos ${meses} meses para dibujar el río (tienes ${claves.length}).` };
   const semanaActual = fechaLocalStr(inicioPeriodo('semana', new Date()));
   const ultima = claves[claves.length - 1] > semanaActual ? claves[claves.length - 1] : semanaActual;
   const todasClaves = [];
@@ -12082,7 +12091,6 @@ function calcularRioTemporada(sesiones) {
     return { semana: k, tss: e.tss, dolorProm: e.dolores.length ? e.dolores.reduce((a, b) => a + b, 0) / e.dolores.length : null };
   });
 
-  if (claves.length < 3) return { disponible: false, motivo: `Hacen falta al menos 3 semanas con sesiones para dibujar el río (tienes ${claves.length}).` };
 
   return { disponible: true, semanas, categorias: CATEGORIAS_RIO };
 }
@@ -12131,7 +12139,7 @@ function marcasMesRio(semanas) {
   let previa = -1;
   marcas.forEach((m, i) => {
     if (!m.etiqueta) return;
-    if (previa >= 0 && m.pct - marcas[previa].pct < 8) {
+    if (previa >= 0 && m.pct - marcas[previa].pct < 7) {
       // Enero manda: marca el cambio de año. Si choca, cede el otro mes.
       if (marcas[previa].mes === 0) { m.etiqueta = ''; return; }
       marcas[previa].etiqueta = '';
@@ -12220,8 +12228,17 @@ function renderRioTemporadaWidget() {
   const el = document.getElementById('rioTemporadaWidget');
   if (!el) return;
   const datos = calcularRioTemporada(loadSesionesMeta());
+  const selectorHtml = `
+      <div class="stats-period rio-ventana" style="margin-top:4px;">
+        <button class="stats-period-btn ${rioVentanaMeses === 12 ? 'active' : ''}" data-meses="12">12 meses</button>
+        <button class="stats-period-btn ${rioVentanaMeses === 24 ? 'active' : ''}" data-meses="24">24 meses</button>
+      </div>`;
+  const enlazarSelector = () => el.querySelectorAll('.rio-ventana .stats-period-btn').forEach(btn => {
+    btn.addEventListener('click', () => { rioVentanaMeses = Number(btn.dataset.meses); renderRioTemporadaWidget(); });
+  });
   if (!datos.disponible) {
-    el.innerHTML = datos.motivo ? `<div class="card"><h3>${icono('rio')} Río de temporada</h3>${estadoVacioHtml(datos.motivo)}</div>` : '';
+    el.innerHTML = datos.motivo ? `<div class="card"><h3>${icono('rio')} Río de temporada</h3>${selectorHtml}${estadoVacioHtml(datos.motivo)}</div>` : '';
+    enlazarSelector();
     return;
   }
   const leyendaDisciplinas = datos.categorias
@@ -12231,8 +12248,9 @@ function renderRioTemporadaWidget() {
   el.innerHTML = `
     <div class="card">
       <h3>${icono('rio')} Río de temporada</h3>
+      ${selectorHtml}
       <div class="rio-rango">${formatoFechaLargaRio(datos.semanas[0].semana)} → hoy · ${datos.semanas.length} semanas</div>
-      <p class="hint">Carga semanal por disciplina desde que empezaste a registrar en Wattly. Las semanas sin sesiones cuentan como carga 0, así que un parón se ve como un estrechamiento. La línea roja es tu dolor de rodilla medio esa semana — con escala propia, no está sumada al río. Toca el río para ver el desglose de una semana.</p>
+      <p class="hint">Carga semanal por disciplina en los últimos ${rioVentanaMeses} meses (o desde tu primera sesión en Wattly, si es más reciente). Las semanas sin sesiones cuentan como carga 0, así que un parón se ve como un estrechamiento. La línea roja es tu dolor de rodilla medio esa semana — con escala propia, no está sumada al río. Toca el río para ver el desglose de una semana.</p>
       ${generarSvgRioTemporada(datos)}
       <div class="rio-meses">${marcasMesRio(datos.semanas).filter(m => m.etiqueta && m.pct < 94).map(m => `<span style="left:${m.pct.toFixed(2)}%">${m.etiqueta}${m.conAnio ? `<b>${m.anio}</b>` : ''}</span>`).join('')}</div>
       <div class="rio-detalle">Toca el río para ver una semana.</div>
@@ -12242,6 +12260,8 @@ function renderRioTemporadaWidget() {
       </div>
     </div>
   `;
+
+  enlazarSelector();
 
   // Tocar una semana: detalle fijo debajo + línea vertical de selección
   // (el <title> del SVG solo sirve con ratón, no en el móvil).
@@ -12573,7 +12593,7 @@ function renderEstadisticas() {
       <p class="hint">Sin sesiones registradas todavía.</p>`;
     ['recordsStatsWidget', 'vo2maxTendenciaWidget', 'dolorRodillaStatsWidget', 'zapatillasStatsWidget']
       .forEach(id => { const c = document.getElementById(id); if (c) c.innerHTML = ''; });
-    document.querySelectorAll('.stats-period-btn').forEach(btn => {
+    document.querySelectorAll('#statsWidget .stats-period-btn').forEach(btn => {
       btn.addEventListener('click', () => { statsPeriodoActual = btn.dataset.periodo; renderEstadisticas(); });
     });
     renderWidgetsEstadisticas();
@@ -12673,7 +12693,7 @@ function renderEstadisticas() {
       ${vo2maxSvg}
     </div>` : '';
 
-  document.querySelectorAll('.stats-period-btn').forEach(btn => {
+  document.querySelectorAll('#statsWidget .stats-period-btn').forEach(btn => {
     btn.addEventListener('click', () => { statsPeriodoActual = btn.dataset.periodo; renderEstadisticas(); });
   });
 
