@@ -310,34 +310,21 @@
   .link-btn{ background:none; border:none; color:var(--teal); font-family:'Inter',sans-serif; font-size:12px; font-weight:600; padding:0; cursor:pointer; text-decoration:underline; }
   .modal-section-title{ font-family:'Space Grotesk',sans-serif; font-size:13px; color:var(--text-dim); margin:14px 0 8px; }
 
-  .alert-card{
-    padding:12px 14px; border-radius:10px; margin-bottom:10px; font-size:13px;
-    line-height:1.4; border:1px solid; background:var(--surface);
-  }
-  .alert-card.alert-warn{ border-color:var(--amber); color:var(--amber); background:rgba(214,163,84,.1); }
-  .alert-card.alert-down{ border-color:var(--red); color:var(--red); background:rgba(193,72,62,.1); }
-
-  .semaforo-card{ padding:14px 16px; border-radius:12px; margin-bottom:12px; border:1px solid var(--line); background:var(--surface); }
-  .semaforo-titulo{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14.5px; margin-bottom:4px; }
-  .semaforo-card p{ margin:0; }
-  .semaforo-descanso{ border-color:var(--red); background:rgba(193,72,62,.08); }
-  .semaforo-descanso .semaforo-titulo{ color:var(--red); }
-  .semaforo-ligero{ border-color:var(--amber); background:rgba(214,163,84,.08); }
-  .semaforo-ligero .semaforo-titulo{ color:var(--amber); }
-  .semaforo-normal{ border-color:var(--teal); background:rgba(76,140,130,.08); }
-  .semaforo-normal .semaforo-titulo{ color:var(--teal); }
-  .semaforo-neutral .semaforo-titulo{ color:var(--text-dim); }
-
   .racha-chip{
-    display:inline-block; margin-bottom:12px; font-family:'JetBrains Mono',monospace; font-size:12px;
+    display:inline-block; margin-top:10px; font-family:'JetBrains Mono',monospace; font-size:12px;
     color:var(--amber); background:rgba(214,163,84,.1); border:1px solid var(--amber);
     border-radius:999px; padding:7px 13px;
   }
   .fase-chip{ margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,.08); font-size:12px; }
 
-  /* Qué hacer hoy: mismo lenguaje visual que .semaforo-card (borde de color
-     según nivel) para que se lea como parte del mismo sistema de estado del
-     día, no como un widget aparte. */
+  /* Qué hacer hoy: única tarjeta de decisión del día. Absorbe el antiguo
+     semáforo (nivel, sueño, fase, racha) y las alertas de riesgo, para no
+     repetir el mismo aviso en tres tarjetas seguidas. Borde según nivel. */
+  .qhh-alertas{ margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; gap:6px; }
+  .qhh-alerta{ font-size:12.5px; line-height:1.4; display:flex; gap:8px; align-items:baseline; }
+  .qhh-alerta::before{ content:''; width:7px; height:7px; border-radius:50%; flex-shrink:0; transform:translateY(-1px); }
+  .qhh-alerta.warn{ color:var(--amber); } .qhh-alerta.warn::before{ background:var(--amber); }
+  .qhh-alerta.down{ color:var(--red); } .qhh-alerta.down::before{ background:var(--red); }
   .qhh-card.qhh-descanso{ border-color:var(--red); }
   .qhh-card.qhh-ligero{ border-color:var(--amber); }
   .qhh-card.qhh-normal{ border-color:var(--teal); }
@@ -537,6 +524,20 @@
   .zapatilla-item-actions button.danger{ color:var(--red); }
   .zapatilla-item.retirada{ opacity:.55; }
 
+  /* ---------- Añadir sesión (Registro) ---------- */
+  .importar-opciones{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:10px; }
+  .importar-op{
+    display:flex; flex-direction:column; gap:4px; align-items:flex-start; text-align:left; cursor:pointer;
+    padding:12px 10px; border-radius:12px; border:1px solid var(--line); background:var(--surface-2); color:var(--text);
+    font:inherit; min-width:0;
+  }
+  .importar-op:first-child{ border-color:var(--teal); }
+  .importar-op:active{ transform:scale(.98); }
+  .importar-op-tit{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14px; }
+  .importar-op-desc{ font-size:11px; color:var(--text-dim); line-height:1.35; }
+  @media (max-width:360px){ .importar-opciones{ grid-template-columns:1fr; } }
+  .importar-opciones ~ .status:empty{ display:none; }
+
   /* ---------- Acceso a Wattly Wrapped desde Stats ---------- */
   .wrapped-abrir-btn{
     width:100%; margin-top:20px; padding:14px 16px; text-align:left; cursor:pointer;
@@ -590,18 +591,29 @@
 
   <main>
     <div class="tab-panel" id="panel-registro">
-      <div id="resumenSemanalWidget"></div>
       <div id="recordsPersonalesWidget"></div>
-      <div id="queHacerHoyWidget"></div>
-      <div id="semaforoWidget"></div>
-      <div id="alertaRiesgo"></div>
+      <div class="card">
+        <h3>➕ Añadir sesión</h3>
+        <div class="importar-opciones">
+          <label class="importar-op" for="fileInput">
+            <span class="importar-op-tit">⌚ Archivo .FIT</span>
+            <span class="importar-op-desc">Desde el reloj o el Edge, con GPS y sensores</span>
+          </label>
+          <button class="importar-op" id="soloJsonBtn" type="button">
+            <span class="importar-op-tit">📄 Solo JSON</span>
+            <span class="importar-op-desc">Sin GPS: gimnasio, estiramientos…</span>
+          </button>
+          <button class="importar-op" id="abrirManualSesionBtn" type="button">
+            <span class="importar-op-tit">✍️ A mano</span>
+            <span class="importar-op-desc">Sin reloj de por medio</span>
+          </button>
+        </div>
+        <input type="file" id="fileInput" accept=".fit" style="display:none;">
+        <div id="status" class="status"></div>
+        <input type="file" id="soloJsonInput" accept="application/json" style="display:none;">
+        <div id="soloJsonStatus" class="status"></div>
+      </div>
       <div id="suenoWidget"></div>
-      <input type="file" id="fileInput" accept=".fit">
-      <div id="status" class="status"></div>
-      <button id="soloJsonBtn" class="primary-btn" style="margin-top:6px; width:auto;" title="Para sesiones sin GPS (gimnasio, estiramientos...) donde el .fit no aporta nada que el JSON no tenga ya">📄 Importar sesión solo con JSON (sin .fit)</button>
-      <input type="file" id="soloJsonInput" accept="application/json" style="display:none;">
-      <div id="soloJsonStatus" class="status"></div>
-      <button id="abrirManualSesionBtn" class="primary-btn" style="margin-top:6px; width:auto;" title="Para sesiones sin reloj de por medio — gimnasio, movilidad, o cualquier actividad que no hayas grabado">➕ Añadir sesión sin reloj</button>
       <input type="file" id="balanceJsonInput" accept="application/json" style="display:none;">
       <div id="balanceStatus" class="status"></div>
       <input type="file" id="epocJsonInput" accept="application/json" style="display:none;">
@@ -687,6 +699,8 @@
 
     <div class="tab-panel active" id="panel-debrief">
       <div class="section-divider"><span class="dot"></span> Estado actual</div>
+      <div id="queHacerHoyWidget"></div>
+      <div id="resumenSemanalWidget"></div>
       <div id="formaWidget"></div>
       <div id="acwrRendimientoWidget"></div>
       <div id="radarEstadoWidget"></div>
@@ -1313,8 +1327,7 @@ function renderSuenoWidget() {
     statusEl.textContent = `Guardado (${fecha}).`;
     statusEl.className = 'status ok';
     renderHistorialSueno();
-    renderSemaforo(); // el semáforo puede incorporar el sueño de hoy si ACWR también está alto
-    renderQueHacerHoyWidget();
+    renderQueHacerHoyWidget(); // puede incorporar el sueño de hoy si el día ya venía en amarillo/rojo
   });
 
   renderHistorialSueno();
@@ -8795,50 +8808,6 @@ function renderRecordsPersonales() {
   `;
 }
 
-function renderSemaforo() {
-  const el = document.getElementById('semaforoWidget');
-  if (!el) return;
-  const sesiones = loadSesionesMeta();
-  const semaforo = calcularSemaforo(sesiones);
-  const meta = {
-    descanso: { emoji: '🔴', titulo: 'Hoy, descanso' },
-    ligero: { emoji: '🟡', titulo: 'Hoy, sesión ligera' },
-    normal: { emoji: '🟢', titulo: 'Hoy puedes entrenar normal' },
-    neutral: { emoji: '⚪', titulo: 'Semáforo del día' }
-  }[semaforo.nivel];
-
-  // El sueño nunca decide el nivel por sí solo (ACWR/TSB/dolor siguen
-  // mandando) — solo refuerza el mensaje cuando el semáforo YA estaba en
-  // amarillo o rojo por otro motivo, como segunda señal, no como sustituto.
-  let notaSueno = '';
-  if (semaforo.nivel === 'descanso' || semaforo.nivel === 'ligero') {
-    const suenoHoy = obtenerSueno(fechaLocalStr(new Date()));
-    if (suenoHoy) {
-      const motivosSueno = [];
-      if (suenoHoy.horas != null && suenoHoy.horas < 6) motivosSueno.push(`dormiste poco (${suenoHoy.horas}h)`);
-      if (suenoHoy.calidad_pct != null && suenoHoy.calidad_pct < 60) motivosSueno.push(`calidad de sueño baja (${suenoHoy.calidad_pct}%)`);
-      if (motivosSueno.length) notaSueno = ` Además, ${motivosSueno.join(' y ')} — doble motivo para no forzar hoy.`;
-    }
-  }
-
-  const racha = calcularRachaSinDolor(sesiones);
-  const rachaHtml = racha ? `
-    <div class="racha-chip">🔥 ${racha.actual} ${racha.actual === 1 ? 'día' : 'días'} sin dolor relevante${racha.record > racha.actual ? ` · récord ${racha.record}` : ''}</div>
-  ` : '';
-
-  const fase = calcularFaseEntrenamiento(sesiones);
-  const faseHtml = fase ? `<p class="hint fase-chip">${fase.emoji} Fase: ${fase.nombre} · ${fase.detalle}</p>` : '';
-
-  el.innerHTML = `
-    <div class="semaforo-card semaforo-${semaforo.nivel}">
-      <div class="semaforo-titulo">${meta.emoji} ${meta.titulo}</div>
-      <p class="hint">${semaforo.texto}${notaSueno}</p>
-      ${faseHtml}
-    </div>
-    ${rachaHtml}
-  `;
-}
-
 // ============================================================
 // ICONOS SVG INLINE — trazo fino, mismo estilo en todos (viewBox 20x20,
 // stroke-width 1.5, currentColor). Sustituyen a los emoji SOLO en sitios
@@ -8927,6 +8896,19 @@ function elegirDisciplinaHoy(sesiones, acwrPorDisciplina) {
   return { sugerida: pool[0], evitar };
 }
 
+// El sueño nunca decide el nivel por sí solo (ACWR/TSB/dolor siguen
+// mandando) — solo refuerza el mensaje cuando el día YA estaba en amarillo
+// o rojo por otro motivo, como segunda señal, no como sustituto.
+function notaSuenoHoy(nivel) {
+  if (nivel !== 'descanso' && nivel !== 'ligero') return '';
+  const suenoHoy = obtenerSueno(fechaLocalStr(new Date()));
+  if (!suenoHoy) return '';
+  const motivosSueno = [];
+  if (suenoHoy.horas != null && suenoHoy.horas < 6) motivosSueno.push(`dormiste poco (${suenoHoy.horas}h)`);
+  if (suenoHoy.calidad_pct != null && suenoHoy.calidad_pct < 60) motivosSueno.push(`calidad de sueño baja (${suenoHoy.calidad_pct}%)`);
+  return motivosSueno.length ? ` Además, ${motivosSueno.join(' y ')} — doble motivo para no forzar hoy.` : '';
+}
+
 function calcularQueHacerHoy(sesiones) {
   if (sesiones.length < MIN_SESIONES_TOTAL) {
     return { disponible: false, motivo: `Hacen falta al menos ${MIN_SESIONES_TOTAL} sesiones registradas para sintetizar una recomendación (tienes ${sesiones.length}).` };
@@ -8938,18 +8920,23 @@ function calcularQueHacerHoy(sesiones) {
   const { sugerida, evitar } = elegirDisciplinaHoy(sesiones, pmc.actual.acwrPorDisciplina || {});
   const tss = calcularTssObjetivoHoy(semaforo.nivel, pmc.actual.ctl, pmc.actual.tsb, fase);
 
-  const motivos = [semaforo.texto];
+  const textoSemaforo = semaforo.texto.charAt(0).toUpperCase() + semaforo.texto.slice(1);
+  const motivos = [textoSemaforo + notaSuenoHoy(semaforo.nivel)];
   if (fase?.fase === 'taper') motivos.push(`Taper activo (${fase.detalle}) — volumen recortado a propósito, no por riesgo.`);
   if (semaforo.nivel !== 'descanso' && sugerida) {
     const nota = sugerida.diasDesde === 0 ? 'la trabajaste hoy' : `${sugerida.diasDesde} día${sugerida.diasDesde === 1 ? '' : 's'} sin tocarla`;
     motivos.push(`${nombreCategoriaDisciplina(sugerida.cat)}: ${nota}${sugerida.riesgo ? ` (ACWR en ${sugerida.riesgo})` : ''}.`);
   }
   evitar.forEach(d => {
-    if (d.riesgo === 'alto') motivos.push(`Evita ${nombreCategoriaDisciplina(d.cat).toLowerCase()} — ACWR en riesgo alto.`);
+    if (d.riesgo === 'alto') {
+      // Si el semáforo ya ha dado el motivo por el ACWR de esta disciplina, no se repite
+      const yaDicho = semaforo.texto.includes('ACWR') && semaforo.texto.includes(nombreCategoriaDisciplina(d.cat));
+      if (!yaDicho) motivos.push(`Evita ${nombreCategoriaDisciplina(d.cat).toLowerCase()} — ACWR en riesgo alto.`);
+    }
     else if ((d.dolorUltima ?? 0) >= RIESGO_DOLOR_UMBRAL) motivos.push(`Evita ${nombreCategoriaDisciplina(d.cat).toLowerCase()} — dolor de rodilla en su última sesión (${d.dolorUltima}/10).`);
   });
 
-  return { disponible: true, nivel: semaforo.nivel, disciplina: sugerida, evitar, tss, fase, motivos };
+  return { disponible: true, nivel: semaforo.nivel, textoSemaforo: semaforo.texto, disciplina: sugerida, evitar, tss, fase, motivos };
 }
 
 function renderQueHacerHoyWidget() {
@@ -8957,8 +8944,32 @@ function renderQueHacerHoyWidget() {
   if (!el) return;
   const sesiones = loadSesionesMeta();
   const r = calcularQueHacerHoy(sesiones);
+
+  // Señales de riesgo que la recomendación no ha dicho ya con otras palabras
+  const evitarAcwr = new Set((r.evitar || []).filter(d => d.riesgo === 'alto').map(d => d.cat));
+  const evitarDolor = (r.evitar || []).some(d => (d.dolorUltima ?? 0) >= RIESGO_DOLOR_UMBRAL);
+  const semaforoHablaDeDolor = /dolor/i.test(r.textoSemaforo || '');
+  const todasAlertas = calcularAlertasRiesgo(sesiones);
+  const acwrGlobal = todasAlertas.find(a => a.tipo === 'acwr_global');
+  const alertas = todasAlertas.filter(a =>
+    !(a.tipo === 'acwr_disciplina' && evitarAcwr.has(a.cat)) &&
+    // con una sola disciplina activa, su ACWR es el global: no repetirlo
+    !(a.tipo === 'acwr_disciplina' && acwrGlobal && a.valor === acwrGlobal.valor) &&
+    !(a.tipo === 'dolor_ultima' && evitarDolor) &&
+    !(a.tipo === 'dolor_reiterado' && semaforoHablaDeDolor));
+  const alertasHtml = alertas.length
+    ? `<div class="qhh-alertas">${alertas.map(a => `<div class="qhh-alerta ${a.nivel}">${a.texto}</div>`).join('')}</div>`
+    : '';
+
+  const fase = sesiones.length ? calcularFaseEntrenamiento(sesiones) : null;
+  const faseHtml = fase ? `<p class="hint fase-chip">${fase.emoji} Fase: ${fase.nombre} · ${fase.detalle}</p>` : '';
+  const racha = sesiones.length ? calcularRachaSinDolor(sesiones) : null;
+  const rachaHtml = racha
+    ? `<div class="racha-chip">🔥 ${racha.actual} ${racha.actual === 1 ? 'día' : 'días'} sin dolor relevante${racha.record > racha.actual ? ` · récord ${racha.record}` : ''}</div>`
+    : '';
+
   if (!r.disponible) {
-    el.innerHTML = `<div class="card"><h3>${icono('compass')} Qué hacer hoy</h3>${estadoVacioHtml(r.motivo)}</div>`;
+    el.innerHTML = `<div class="card"><h3>${icono('compass')} Qué hacer hoy</h3>${estadoVacioHtml(r.motivo)}${alertasHtml}${faseHtml}${rachaHtml}</div>`;
     return;
   }
 
@@ -8987,7 +8998,9 @@ function renderQueHacerHoyWidget() {
       ${disciplinaHtml}
       ${tssHtml}
       <ul class="qhh-motivos">${motivosHtml}</ul>
-      <p class="hint" style="margin-top:8px;">Junta el semáforo, la fase de entrenamiento y el ACWR por disciplina en una sola recomendación — no sustituye a ninguno de ellos.</p>
+      ${alertasHtml}
+      ${faseHtml}
+      ${rachaHtml}
     </div>
   `;
 }
@@ -11287,18 +11300,15 @@ document.getElementById('clearFtpConfiguradoBtn').addEventListener('click', () =
 // ---------- Alertas de riesgo (visibles sin pedir debrief a la IA) ----------
 // Todo esto es cálculo local, gratis, no llama a la API. Se recalcula cada
 // vez que se pinta la Forma para que quede siempre al día.
-function renderAlertas() {
-  const el = document.getElementById('alertaRiesgo');
-  if (!el) return;
-  const sesiones = loadSesionesMeta();
-  if (!sesiones.length) { el.innerHTML = ''; return; }
+function calcularAlertasRiesgo(sesiones) {
+  if (!sesiones.length) return [];
 
   const pmc = calcularPMC(sesiones);
   const acwrInfo = clasificarACWR(pmc.actual.acwr);
   const alertas = [];
 
   if (pmc.actual.acwr != null && acwrInfo.clase !== 'up' && acwrInfo.clase !== 'neutral') {
-    alertas.push({ nivel: acwrInfo.clase, texto: `ACWR global ${pmc.actual.acwr} — ${acwrInfo.texto}` });
+    alertas.push({ tipo: 'acwr_global', valor: pmc.actual.acwr, nivel: acwrInfo.clase, texto: `ACWR global ${pmc.actual.acwr} — ${acwrInfo.texto}` });
   }
 
   // El ACWR por disciplina puede disparar una alerta que el global no ve,
@@ -11306,7 +11316,7 @@ function renderAlertas() {
   Object.entries(pmc.actual.acwrPorDisciplina || {}).forEach(([cat, val]) => {
     const info = clasificarACWR(val);
     if (info.clase !== 'up' && info.clase !== 'neutral') {
-      alertas.push({ nivel: info.clase, texto: `${nombreCategoriaDisciplina(cat)}: ACWR ${val} — ${info.texto}` });
+      alertas.push({ tipo: 'acwr_disciplina', cat, valor: val, nivel: info.clase, texto: `${nombreCategoriaDisciplina(cat)}: ACWR ${val} — ${info.texto}` });
     }
   });
 
@@ -11314,13 +11324,12 @@ function renderAlertas() {
   const ultimasTres = ordenadas.slice(0, 3);
   const conDolorAlto = ultimasTres.filter(s => (s.rodilla.dolor_0_10 ?? 0) >= 5);
   if (conDolorAlto.length >= 2) {
-    alertas.push({ nivel: 'down', texto: `Dolor de rodilla ≥5/10 en ${conDolorAlto.length} de tus últimas ${ultimasTres.length} sesiones registradas` });
+    alertas.push({ tipo: 'dolor_reiterado', nivel: 'down', texto: `Dolor de rodilla ≥5/10 en ${conDolorAlto.length} de tus últimas ${ultimasTres.length} sesiones registradas` });
   } else if (ordenadas[0] && (ordenadas[0].rodilla.dolor_0_10 ?? 0) >= 7) {
-    alertas.push({ nivel: 'warn', texto: `Dolor de rodilla alto (${ordenadas[0].rodilla.dolor_0_10}/10) en tu última sesión` });
+    alertas.push({ tipo: 'dolor_ultima', nivel: 'warn', texto: `Dolor de rodilla alto (${ordenadas[0].rodilla.dolor_0_10}/10) en tu última sesión` });
   }
 
-  if (!alertas.length) { el.innerHTML = ''; return; }
-  el.innerHTML = alertas.map(a => `<div class="alert-card alert-${a.nivel}">🦵 ${a.texto}</div>`).join('');
+  return alertas;
 }
 
 // ---------- Gráfico histórico CTL/ATL (SVG inline, sin librerías) ----------
@@ -13672,11 +13681,9 @@ function renderForma() {
   const el = document.getElementById('formaWidget');
   renderResumenSemanal();
   renderRecordsPersonales();
-  renderSemaforo();
   renderQueHacerHoyWidget();
   if (!sesiones.length) {
     el.innerHTML = estadoVacioHtml('Sin datos suficientes todavía para calcular tu forma (CTL/ATL/TSB).');
-    renderAlertas();
     renderModeloRiesgo();
     renderEstancamientoWidget();
     renderSimulador();
@@ -13766,7 +13773,6 @@ function renderForma() {
       if (infoEl) infoEl.textContent = `${rect.dataset.fecha} · TSS ${rect.dataset.tss}`;
     });
   });
-  renderAlertas();
   renderModeloRiesgo();
   renderEstancamientoWidget();
   renderSimulador();
