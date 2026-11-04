@@ -136,28 +136,6 @@
   .forma-card.up .desacople-valor{ color:var(--teal); }
   .forma-card.warn .desacople-valor{ color:var(--amber); }
   .forma-card.down .desacople-valor{ color:var(--red); }
-  .ipd-card{ display:flex; align-items:center; gap:16px; margin-top:10px; }
-  .ipd-num{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:44px; line-height:1; flex-shrink:0; }
-  .ipd-num.up{ color:var(--teal); }
-  .ipd-num.warn{ color:var(--amber); }
-  .ipd-num.down{ color:var(--red); }
-  .ipd-estado{ font-family:'JetBrains Mono',monospace; font-size:12px; text-transform:uppercase; letter-spacing:.05em; font-weight:600; }
-  .ipd-estado.up{ color:var(--teal); }
-  .ipd-estado.warn{ color:var(--amber); }
-  .ipd-estado.down{ color:var(--red); }
-  .ipd-estado-desc{ font-size:12px; color:var(--text-dim); margin-top:3px; }
-  .ipd-barras{ margin-top:14px; display:flex; flex-direction:column; gap:6px; }
-  .ipd-barra-row{ display:flex; align-items:center; gap:8px; }
-  .ipd-barra-lbl{ font-size:10.5px; color:var(--text-dim); width:58px; flex-shrink:0; }
-  .ipd-barra-track{ flex:1; height:5px; background:var(--surface-2); border-radius:3px; overflow:hidden; }
-  .ipd-barra-fill{ height:100%; border-radius:3px; background:var(--surface-2); }
-  .ipd-barra-fill.up{ background:var(--teal); }
-  .ipd-barra-fill.warn{ background:var(--amber); }
-  .ipd-barra-fill.down{ background:var(--red); }
-  .ipd-barra-val{ font-family:'JetBrains Mono',monospace; font-size:10.5px; max-width:96px; text-align:right; flex-shrink:0; white-space:normal; line-height:1.3; color:var(--text-dim); }
-  .ipd-barra-val.up{ color:var(--teal); }
-  .ipd-barra-val.warn{ color:var(--amber); }
-  .ipd-barra-val.down{ color:var(--red); }
   .pv-resumen{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
   .pv-resumen > div{ background:var(--surface); border-radius:10px; padding:10px; text-align:center; }
   .pv-resumen .etiqueta{ font-size:10.5px; color:var(--text-dim); text-transform:uppercase; }
@@ -228,7 +206,7 @@
   .critico-toggle input{ accent-color:var(--red); width:15px; height:15px; flex-shrink:0; }
   .critico-toggle.checked{ color:var(--red); box-shadow:inset 0 0 0 1px var(--red); }
 
-  #objetivoRow{ display:none; }
+  #objetivoRow{ display:none; margin:4px 0 10px; }
 
   .primary-btn{
     width:100%; padding:13px; background:var(--teal); color:#0F1420; border:none;
@@ -559,6 +537,18 @@
   .zapatilla-item-actions button.danger{ color:var(--red); }
   .zapatilla-item.retirada{ opacity:.55; }
 
+  /* ---------- Acceso a Wattly Wrapped desde Stats ---------- */
+  .wrapped-abrir-btn{
+    width:100%; margin-top:20px; padding:14px 16px; text-align:left; cursor:pointer;
+    background:var(--surface); border:1px solid var(--line); border-radius:14px; color:var(--text);
+    display:flex; flex-direction:column; gap:4px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;
+  }
+  .wrapped-abrir-btn .hint{ font-family:'Inter',sans-serif; font-weight:400; margin:0; }
+  .volver-btn{
+    background:none; border:none; color:var(--text-dim); cursor:pointer; padding:4px 0 12px;
+    font-family:'JetBrains Mono',monospace; font-size:12px;
+  }
+
   /* ---------- Río de temporada (streamgraph) ---------- */
   .rio-svg{ width:100%; height:auto; margin-top:10px; display:block; cursor:pointer; }
   .rio-rango{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim); margin:8px 0 6px; }
@@ -586,11 +576,10 @@
   <header>
     <div class="eyebrow"><span class="dot"></span> WATTLY · JAVI</div>
     <div class="tabs">
-      <button class="tab-btn active" data-tab="registro">Registro</button>
+      <button class="tab-btn active" data-tab="debrief">Hoy</button>
+      <button class="tab-btn" data-tab="registro">Registro</button>
       <button class="tab-btn" data-tab="rutas">Rutas</button>
       <button class="tab-btn" data-tab="estadisticas">Stats</button>
-      <button class="tab-btn" data-tab="debrief">Debrief</button>
-      <button class="tab-btn" data-tab="wrapped">Wrapped</button>
       <button class="tab-btn" data-tab="ajustes">Ajustes</button>
     </div>
     <svg class="header-river" viewBox="0 0 400 10" preserveAspectRatio="none" aria-hidden="true">
@@ -600,7 +589,7 @@
   </header>
 
   <main>
-    <div class="tab-panel active" id="panel-registro">
+    <div class="tab-panel" id="panel-registro">
       <div id="resumenSemanalWidget"></div>
       <div id="recordsPersonalesWidget"></div>
       <div id="queHacerHoyWidget"></div>
@@ -636,9 +625,14 @@
         <summary><span class="dot"></span> Qué ha cambiado</summary>
         <div id="quecambioWidget"></div>
         <div id="comparadorMesesWidget"></div>
+        <div id="estancamientoWidget"></div>
         <div id="vo2maxTendenciaWidget"></div>
         <div id="vamWidget"></div>
         <div id="balanceAerobicoWidget"></div>
+        <details class="tool-details">
+          <summary>🔍 Comparador de sesiones gemelas <span class="beta-tag">beta</span></summary>
+          <div id="comparadorWidget"></div>
+        </details>
       </details>
 
       <details class="stats-seccion" data-seccion="capacidad">
@@ -668,18 +662,31 @@
       <details class="stats-seccion" data-seccion="cuerpo">
         <summary><span class="dot"></span> Cuerpo y material</summary>
         <div id="dolorRodillaStatsWidget"></div>
+        <div id="correlacionesWidget"></div>
+        <details class="tool-details">
+          <summary>⚡ Desacople cardíaco vs. dolor <span class="beta-tag">beta</span></summary>
+          <div id="desacopleCorrWidget"></div>
+        </details>
         <div id="zapatillasStatsWidget"></div>
       </details>
 
       <details class="stats-seccion" data-seccion="fiabilidad">
         <summary><span class="dot"></span> Fiabilidad de Wattly</summary>
         <div id="calibracionWidget"></div>
+        <details class="tool-details">
+          <summary>📊 Fiabilidad de tus señales <span class="beta-tag">beta</span></summary>
+          <div id="fiabilidadWidget"></div>
+        </details>
       </details>
+
+      <button class="wrapped-abrir-btn" id="abrirWrappedBtn">
+        <span>✨ Wattly Wrapped</span>
+        <span class="hint">Resumen de un rango de fechas, tarjeta a tarjeta →</span>
+      </button>
     </div>
 
-    <div class="tab-panel" id="panel-debrief">
+    <div class="tab-panel active" id="panel-debrief">
       <div class="section-divider"><span class="dot"></span> Estado actual</div>
-      <div id="ipdWidget"></div>
       <div id="formaWidget"></div>
       <div id="acwrRendimientoWidget"></div>
       <div id="radarEstadoWidget"></div>
@@ -702,8 +709,6 @@
         <div id="prediccionCarreraWidget"></div>
       </div>
       <div id="modeloRiesgoWidget"></div>
-      <div id="estancamientoWidget"></div>
-      <div id="correlacionesWidget"></div>
 
       <div class="section-divider"><span class="dot"></span> Herramientas</div>
       <details class="tool-details">
@@ -713,18 +718,6 @@
       <details class="tool-details">
         <summary>🏖️ Simulador de parón <span class="beta-tag">beta</span></summary>
         <div id="paronWidget"></div>
-      </details>
-      <details class="tool-details">
-        <summary>⚡ Desacople cardíaco vs. dolor <span class="beta-tag">beta</span></summary>
-        <div id="desacopleCorrWidget"></div>
-      </details>
-      <details class="tool-details">
-        <summary>📊 Fiabilidad de tus señales <span class="beta-tag">beta</span></summary>
-        <div id="fiabilidadWidget"></div>
-      </details>
-      <details class="tool-details">
-        <summary>🔍 Comparador de sesiones gemelas <span class="beta-tag">beta</span></summary>
-        <div id="comparadorWidget"></div>
       </details>
       <details class="tool-details">
         <summary>🧩 Semana que funciona <span class="beta-tag">beta</span></summary>
@@ -740,9 +733,7 @@
         <input type="checkbox" id="criticoCheckbox">
         <span>🔴 Lectura crítica (fuerza la interpretación más preocupante defendible con tus datos)</span>
       </label>
-      <div id="objetivoRow">
-        <input type="text" id="objetivoInput" placeholder="Objetivo opcional: ej. carrera 10K el 20 sept">
-      </div>
+      <div id="objetivoRow" class="hint"></div>
       <button class="primary-btn" id="generarBtn">Generar debrief</button>
       <div id="debriefStatus" class="status"></div>
       <div id="debriefOutput"></div>
@@ -759,6 +750,7 @@
     </div>
 
     <div class="tab-panel" id="panel-wrapped">
+      <button class="volver-btn" id="volverWrappedBtn">← Volver a Stats</button>
       <div class="card">
         <h3><svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2 L11.4 8.4 L18 10 L11.4 11.6 L10 18 L8.6 11.6 L2 10 L8.6 8.4 Z" fill="currentColor" stroke="none"/></svg> Wattly Wrapped</h3>
         <p class="hint">Elige un rango de fechas (año, temporada, lo que sea) y saca el resumen de esas sesiones — deslizando tarjeta a tarjeta.</p>
@@ -1032,15 +1024,6 @@ function obtenerSueno(fecha) {
   return loadSueno()[fecha] || null;
 }
 
-const LS_VFC_NORMAL_KEY = 'em_vfc_normal'; // { min, max } declarado a mano por el usuario
-function loadVfcNormal() {
-  const raw = localStorage.getItem(LS_VFC_NORMAL_KEY);
-  if (!raw) return null;
-  try { return JSON.parse(raw); } catch (e) { return null; }
-}
-function saveVfcNormal(min, max) {
-  localStorage.setItem(LS_VFC_NORMAL_KEY, JSON.stringify({ min, max }));
-}
 
 // ---------- IndexedDB ----------
 function openDB() {
@@ -1301,15 +1284,6 @@ function renderSuenoWidget() {
         <summary>📋 Historial de sueño</summary>
         <div id="suenoHistorial"></div>
       </details>
-      <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--surface-2);">
-        <p class="hint">Tu rango normal de VFC (para el IPD — fuera de este rango cuenta como señal de alerta)</p>
-        <div class="sueno-inputs" style="margin-top:6px;">
-          <input type="number" id="vfcMinInput" placeholder="Mín. ms" min="0">
-          <input type="number" id="vfcMaxInput" placeholder="Máx. ms" min="0">
-        </div>
-        <button class="primary-btn" id="guardarVfcNormalBtn" style="margin-top:8px;">Guardar rango</button>
-        <div id="vfcNormalStatus" class="status"></div>
-      </div>
     </div>
   `;
 
@@ -1317,23 +1291,6 @@ function renderSuenoWidget() {
   fechaInput.value = fechaLocalStr(new Date());
   precargarCamposSueno(fechaInput.value);
   fechaInput.addEventListener('change', () => precargarCamposSueno(fechaInput.value));
-
-  const vfcNormal = loadVfcNormal();
-  if (vfcNormal) {
-    document.getElementById('vfcMinInput').value = vfcNormal.min ?? '';
-    document.getElementById('vfcMaxInput').value = vfcNormal.max ?? '';
-  }
-  document.getElementById('guardarVfcNormalBtn').addEventListener('click', () => {
-    const statusEl = document.getElementById('vfcNormalStatus');
-    const min = document.getElementById('vfcMinInput').value;
-    const max = document.getElementById('vfcMaxInput').value;
-    if (min === '' || max === '') { statusEl.textContent = 'Rellena mínimo y máximo.'; statusEl.className = 'status err'; return; }
-    if (Number(min) >= Number(max)) { statusEl.textContent = 'El mínimo debe ser menor que el máximo.'; statusEl.className = 'status err'; return; }
-    saveVfcNormal(Number(min), Number(max));
-    statusEl.textContent = 'Guardado.';
-    statusEl.className = 'status ok';
-    renderIPDWidget();
-  });
 
   document.getElementById('guardarSuenoBtn').addEventListener('click', () => {
     const fecha = fechaInput.value;
@@ -1357,7 +1314,6 @@ function renderSuenoWidget() {
     statusEl.className = 'status ok';
     renderHistorialSueno();
     renderSemaforo(); // el semáforo puede incorporar el sueño de hoy si ACWR también está alto
-    renderIPDWidget();
     renderQueHacerHoyWidget();
   });
 
@@ -8307,157 +8263,6 @@ function generarSvgComparadorMesesForma(formaRaw, labelA, labelB) {
 }
 
 // ============================================================
-// IPD — ÍNDICE DE PREPARACIÓN DIARIA
-// Réplica fiel de la fórmula real de la app Stride (HTML cedido por el
-// usuario), adaptada a las variables que ya existen en Wattly. Reutiliza
-// riesgoACWR() de Wattly en vez de los umbrales propios de Stride para no
-// tener dos criterios de ACWR distintos conviviendo en la misma app.
-// El estrés (que Stride sí pide como check-in) se deja fuera: Wattly no lo
-// registra y no se quiso añadir un campo nuevo solo para esto.
-// ============================================================
-function calcularFatigaEpocPct(sesiones) {
-  const ahora = Date.now();
-  const epoc7 = sesiones
-    .filter(s => s.datos_suunto.epoc > 0 && new Date(s.fecha + 'T12:00:00').getTime() > ahora - 7 * 86400000)
-    .reduce((sum, s) => sum + s.datos_suunto.epoc, 0);
-  const conEpoc = sesiones.filter(s => s.datos_suunto.epoc > 0);
-  const epocMedia = conEpoc.length ? mediaDe(conEpoc.map(s => s.datos_suunto.epoc)) : 0;
-  return epocMedia > 0 ? Math.round((epoc7 / (epocMedia * 3.5)) * 100) : null;
-}
-
-function calcularIPD(sesiones) {
-  const componentes = [];
-  let base = 100;
-
-  const ordenadas = sesiones.slice().sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora));
-  const ultima = ordenadas[0] || null;
-  const pmc = calcularPMC(sesiones);
-
-  // Dolor (de tu sesión más reciente — Wattly no tiene un "check-in" de dolor separado de las sesiones)
-  const dolor = ultima?.rodilla?.dolor_0_10 ?? null;
-  let penDolor = 0, clsDolor = '';
-  if (dolor != null) {
-    if (dolor <= 2) { penDolor = 0; clsDolor = 'up'; }
-    else if (dolor <= 4) { penDolor = 15; clsDolor = 'warn'; }
-    else if (dolor <= 6) { penDolor = 25; clsDolor = 'warn'; }
-    else { penDolor = 35; clsDolor = 'down'; }
-  }
-  componentes.push({ lbl: 'Dolor', pen: penDolor, cls: clsDolor, val: dolor != null ? `${dolor}/10` : '—' });
-
-  // ACWR — umbrales de Wattly (riesgoACWR), no los de Stride
-  const acwr = pmc.actual.acwr;
-  const riesgo = riesgoACWR(acwr);
-  let penACWR, clsACWR;
-  if (acwr == null) { penACWR = 5; clsACWR = 'warn'; }
-  else if (riesgo === 'alto') { penACWR = 20; clsACWR = 'down'; }
-  else if (riesgo === 'precaucion') { penACWR = 10; clsACWR = 'warn'; }
-  else { penACWR = 0; clsACWR = 'up'; }
-  componentes.push({ lbl: 'ACWR', pen: penACWR, cls: clsACWR, val: acwr ?? '—' });
-
-  // Fatiga EPOC (7 días vs. 3.5× tu media personal)
-  const fatigaPct = calcularFatigaEpocPct(sesiones);
-  let penFatiga = 0, clsFatiga = '';
-  if (fatigaPct != null) {
-    if (fatigaPct < 70) { penFatiga = 0; clsFatiga = 'up'; }
-    else if (fatigaPct < 100) { penFatiga = 5; clsFatiga = 'up'; }
-    else if (fatigaPct < 120) { penFatiga = 10; clsFatiga = 'warn'; }
-    else { penFatiga = 15; clsFatiga = 'down'; }
-  }
-  componentes.push({ lbl: 'Fatiga', pen: penFatiga, cls: clsFatiga, val: fatigaPct != null ? `${fatigaPct}%` : '—' });
-
-  // Asimetría (de tu última sesión con balance importado)
-  const ultimaConBalance = ordenadas.find(s => s.datos_suunto.balance_izq_pct != null);
-  const balDesv = ultimaConBalance ? Math.abs(ultimaConBalance.datos_suunto.balance_izq_pct - 50) : null;
-  let penBal = 0, clsBal = '';
-  if (balDesv != null) {
-    if (balDesv <= 3) { penBal = 0; clsBal = 'up'; }
-    else if (balDesv <= 5) { penBal = 5; clsBal = 'warn'; }
-    else { penBal = 10; clsBal = 'down'; }
-  }
-  componentes.push({ lbl: 'Asimetría', pen: penBal, cls: clsBal, val: balDesv != null ? `${balDesv.toFixed(1)}%` : '—' });
-
-  // Sueño/VFC de hoy
-  const hoyStr = fechaLocalStr(new Date());
-  const suenoHoy = obtenerSueno(hoyStr);
-  let penSueno = 0, clsSueno = '', valSueno = '—';
-  if (suenoHoy) {
-    let subPen = 0;
-    if (suenoHoy.horas != null) {
-      if (suenoHoy.horas < 6) subPen += 8;
-      else if (suenoHoy.horas < 7) subPen += 4;
-    }
-    if (suenoHoy.calidad_pct != null) {
-      // Wattly guarda la calidad en % (0-100); Stride la pide en escala 1-5.
-      // Se convierte a esa escala solo para aplicar los mismos cortes originales.
-      const calidad5 = Math.max(1, Math.min(5, Math.ceil(suenoHoy.calidad_pct / 20)));
-      if (calidad5 <= 2) subPen += 6;
-      else if (calidad5 === 3) subPen += 2;
-    }
-    if (suenoHoy.vfc_ms != null) {
-      const rango = loadVfcNormal();
-      if (rango && rango.min != null && rango.max != null) {
-        if (suenoHoy.vfc_ms < rango.min) {
-          const pctBajo = (rango.min - suenoHoy.vfc_ms) / rango.min;
-          subPen += pctBajo > 0.15 ? 7 : 4;
-        } else if (suenoHoy.vfc_ms > rango.max) {
-          const pctAlto = (suenoHoy.vfc_ms - rango.max) / rango.max;
-          if (pctAlto > 0.15) subPen += 3;
-        }
-      } else {
-        // Sin rango declarado: fallback a la media de tus últimos registros (mínimo 3)
-        const historial = Object.entries(loadSueno())
-          .filter(([f, r]) => f !== hoyStr && r.vfc_ms != null)
-          .sort((a, b) => b[0].localeCompare(a[0]))
-          .slice(0, 7)
-          .map(([, r]) => r.vfc_ms);
-        if (historial.length >= 3) {
-          const media = mediaDe(historial);
-          if (suenoHoy.vfc_ms < media * 0.85) subPen += 4;
-        }
-      }
-    }
-    penSueno = Math.min(15, subPen);
-    clsSueno = penSueno === 0 ? 'up' : penSueno <= 6 ? 'warn' : 'down';
-    const partes = [];
-    if (suenoHoy.horas != null) partes.push(`${suenoHoy.horas}h`);
-    if (suenoHoy.calidad_pct != null) partes.push(`${suenoHoy.calidad_pct}%`);
-    if (suenoHoy.vfc_ms != null) partes.push(`${suenoHoy.vfc_ms}ms`);
-    valSueno = partes.join(' · ') || '—';
-  }
-  componentes.push({ lbl: 'Sueño/VFC', pen: penSueno, cls: clsSueno, val: valSueno });
-
-  // Descanso (bono, no penalización)
-  // Se usa fecha+hora REAL de la última sesión, no la medianoche de su fecha
-  // — si no, cruzar la medianoche regala casi un día entero de "descanso"
-  // aunque hayan pasado solo unas horas (ej. sesión ayer 20:30, ahora 11:39
-  // del día siguiente = 15h reales, no 1 día completo).
-  let bonusDesc = 0, clsDesc = '', valDesc = '—';
-  if (ultima) {
-    const timestampUltima = new Date(`${ultima.fecha}T${ultima.hora || '00:00'}:00`).getTime();
-    const horasDescanso = (Date.now() - timestampUltima) / 3600000;
-    const diasDescanso = Math.max(0, Math.floor(horasDescanso / 24));
-    if (diasDescanso === 0) { bonusDesc = 0; clsDesc = 'up'; }
-    else if (diasDescanso === 1) { bonusDesc = 5; clsDesc = 'up'; }
-    else { bonusDesc = 10; clsDesc = 'up'; }
-    valDesc = `${diasDescanso}d`;
-  }
-  base += bonusDesc;
-  componentes.push({ lbl: 'Descanso', pen: -bonusDesc, cls: clsDesc, val: valDesc, bonus: true });
-
-  const totalPen = componentes.reduce((s, c) => c.bonus ? s : s + c.pen, 0);
-  const ipd = Math.max(0, Math.min(100, base - totalPen));
-
-  let estado, estadoDesc;
-  if (ipd >= 90) { estado = 'up'; estadoDesc = 'Día ideal para carga alta'; }
-  else if (ipd >= 75) { estado = 'up'; estadoDesc = 'Listo para entrenar con normalidad'; }
-  else if (ipd >= 60) { estado = 'warn'; estadoDesc = 'Reduce la intensidad hoy'; }
-  else if (ipd >= 40) { estado = 'warn'; estadoDesc = 'Solo trabajo suave o movilidad'; }
-  else { estado = 'down'; estadoDesc = 'Descanso activo — no entrenes hoy'; }
-
-  return { ipd, estado, estadoDesc, componentes };
-}
-
-// ============================================================
 // MODELO DE RIESGO DE DOLOR (regresión logística entrenada con tus datos)
 // A diferencia del semáforo (reglas fijas que puse yo a ojo), esto aprende
 // de tu propio historial qué combinación de factores predice dolor de
@@ -8653,9 +8458,6 @@ function calcularModeloRiesgo(sesiones) {
 // ACWR/TSB "tal como estaban" antes de cada sesión, emparejado con si esa
 // sesión acabó doliendo) — no hace falta motor nuevo, solo mirar los mismos
 // datos desde el ángulo de "¿cuántas veces acertó esta señal en concreto?".
-// El IPD se deja fuera: es nuevo, no hay rastro histórico diario guardado
-// todavía con el que auditarlo — solo tiene sentido en cuanto se acumule
-// unas semanas de datos.
 function calcularFiabilidadSenales(sesiones) {
   const ejemplos = construirEjemplosRiesgo(sesiones);
   if (ejemplos.length < MIN_SESIONES_TOTAL) {
@@ -9034,51 +8836,6 @@ function renderSemaforo() {
       ${faseHtml}
     </div>
     ${rachaHtml}
-  `;
-}
-
-// ---------- IPD: UI ----------
-function renderIPDWidget() {
-  const el = document.getElementById('ipdWidget');
-  if (!el) return;
-  const sesiones = loadSesionesMeta();
-  if (sesiones.length < 3) {
-    el.innerHTML = `<div class="card"><h3>📋 IPD — Índice de preparación diaria</h3><p class="hint">Registra alguna sesión más para calcular el IPD.</p></div>`;
-    return;
-  }
-  const r = calcularIPD(sesiones);
-  const maxPen = { 'Dolor': 35, 'ACWR': 20, 'Fatiga': 15, 'Asimetría': 10, 'Sueño/VFC': 15, 'Descanso': 10 };
-  const estadoNombre = { up: 'Listo', warn: 'Precaución', down: 'Alerta' }[r.estado];
-
-  const barrasHtml = r.componentes.map(c => {
-    const max = maxPen[c.lbl] || 10;
-    const pct = c.bonus ? Math.round((Math.abs(c.pen) / max) * 100) : Math.round((1 - c.pen / max) * 100);
-    const clase = c.cls || '';
-    const penTxt = c.bonus
-      ? (c.pen !== 0 ? ` +${Math.abs(c.pen)}` : '')
-      : (c.pen > 0 ? ` −${c.pen}` : '');
-    return `
-      <div class="ipd-barra-row">
-        <span class="ipd-barra-lbl">${c.lbl}</span>
-        <div class="ipd-barra-track"><div class="ipd-barra-fill ${clase}" style="width:${Math.max(0, Math.min(100, pct))}%"></div></div>
-        <span class="ipd-barra-val ${clase}">${c.val}${penTxt}</span>
-      </div>
-    `;
-  }).join('');
-
-  el.innerHTML = `
-    <div class="card">
-      <h3>📋 IPD <span class="beta-tag">beta</span></h3>
-      <div class="ipd-card">
-        <div class="ipd-num ${r.estado}">${r.ipd}</div>
-        <div class="ipd-info">
-          <div class="ipd-estado ${r.estado}">${estadoNombre}</div>
-          <div class="ipd-estado-desc">${r.estadoDesc}</div>
-        </div>
-      </div>
-      <div class="ipd-barras">${barrasHtml}</div>
-      <p class="hint" style="margin-top:10px;">Réplica de la fórmula de la app Stride, adaptada a tus datos de Wattly. Combina dolor, ACWR, fatiga (EPOC), asimetría y sueño/VFC en un solo número — no sustituye al semáforo ni al modelo de riesgo, es una vista adicional.</p>
-    </div>
   `;
 }
 
@@ -9838,7 +9595,6 @@ function renderFiabilidadWidget() {
       resEl.innerHTML = `
         ${filasSenales}
         ${modeloHtml}
-        <p class="hint" style="margin-top:8px;">El IPD se queda fuera de esta auditoría — es nuevo, todavía no hay rastro histórico diario acumulado con el que comprobarlo.</p>
       `;
     } catch (err) {
       console.error(err);
@@ -10342,6 +10098,16 @@ function cambiarTab(tab) {
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => cambiarTab(btn.dataset.tab));
 });
+
+// Wrapped ya no es pestaña: se abre desde el final de Stats. La pestaña
+// Stats sigue marcada mientras está abierto, porque es de donde vienes.
+function abrirWrapped() {
+  cambiarTab('estadisticas');
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-wrapped'));
+  window.scrollTo(0, 0);
+}
+document.getElementById('abrirWrappedBtn').addEventListener('click', abrirWrapped);
+document.getElementById('volverWrappedBtn').addEventListener('click', () => { cambiarTab('estadisticas'); window.scrollTo(0, 0); });
 
 // Tras reconocer que la sesión importada coincide con un tramo, comprueba en
 // segundo plano (sin bloquear el mensaje de "Guardada") si esa sesión tuvo un
@@ -11200,7 +10966,6 @@ async function renderTramos() {
 // ---------- Debrief / IA ----------
 let modoActual = 'analista';
 let criticoActivo = false;
-const LS_OBJETIVO = 'em_objetivo_pronostico';
 const LS_CARRERA_NOMBRE = 'em_carrera_nombre';
 const LS_CARRERA_FECHA = 'em_carrera_fecha';
 const LS_CARRERA_DISTANCIA = 'em_carrera_distancia_km';
@@ -11212,10 +10977,29 @@ criticoCheckboxEl.addEventListener('change', () => {
   criticoToggleLabelEl.classList.toggle('checked', criticoActivo);
 });
 
-const objetivoInputEl = document.getElementById('objetivoInput');
-objetivoInputEl.value = localStorage.getItem(LS_OBJETIVO) || '';
-objetivoInputEl.addEventListener('input', () => {
-  localStorage.setItem(LS_OBJETIVO, objetivoInputEl.value);
+// El objetivo del pronóstico ya no se escribe aparte: sale de la tarjeta
+// "Carrera objetivo". Una carrera ya pasada no cuenta como objetivo.
+function objetivoDesdeCarrera() {
+  const fecha = localStorage.getItem(LS_CARRERA_FECHA) || '';
+  const hoyStr = fechaLocalStr(new Date());
+  if (!fecha || fecha < hoyStr) return '';
+  const nombre = (localStorage.getItem(LS_CARRERA_NOMBRE) || '').trim() || 'Carrera';
+  const km = Number(localStorage.getItem(LS_CARRERA_DISTANCIA)) || null;
+  const dias = Math.round((new Date(fecha + 'T00:00:00') - new Date(hoyStr + 'T00:00:00')) / 86400000);
+  return `${nombre}${km ? ` · ${String(Number(km.toFixed(2))).replace('.', ',')} km` : ''} · ${formatoFechaCorta(fecha)} (faltan ${dias} días)`;
+}
+function renderObjetivoPronostico() {
+  const el = document.getElementById('objetivoRow');
+  if (!el) return;
+  const obj = objetivoDesdeCarrera();
+  el.textContent = obj
+    ? `🎯 Objetivo: ${obj}. Se cambia en la tarjeta Carrera objetivo.`
+    : 'Sin carrera objetivo futura: el pronóstico proyecta las próximas 1-2 semanas. Puedes fijar una en la tarjeta Carrera objetivo.';
+}
+renderObjetivoPronostico();
+['carreraNombreInput', 'carreraFechaInput', 'carreraDistanciaInput', 'carreraDistanciaCustomInput'].forEach(id => {
+  const inp = document.getElementById(id);
+  if (inp) { inp.addEventListener('input', () => setTimeout(renderObjetivoPronostico, 0)); inp.addEventListener('change', () => setTimeout(renderObjetivoPronostico, 0)); }
 });
 
 const carreraNombreInputEl = document.getElementById('carreraNombreInput');
@@ -11298,13 +11082,14 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     modoActual = btn.dataset.mode;
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b === btn));
     document.getElementById('objetivoRow').style.display = modoActual === 'pronostico' ? 'block' : 'none';
+    renderObjetivoPronostico();
   });
 });
 
 document.getElementById('generarBtn').addEventListener('click', async () => {
   const statusEl = document.getElementById('debriefStatus');
   const outEl = document.getElementById('debriefOutput');
-  const objetivo = document.getElementById('objetivoInput').value.trim();
+  const objetivo = objetivoDesdeCarrera();
 
   statusEl.textContent = 'Pensando...';
   statusEl.className = 'status';
@@ -13900,7 +13685,6 @@ function renderForma() {
     renderCorrelaciones();
     renderCarreraObjetivo();
     renderRadarEstadoWidget();
-    renderIPDWidget();
     renderAcwrRendimientoWidget();
     renderSemanaQueFuncionaWidget();
     return;
@@ -13991,7 +13775,6 @@ function renderForma() {
   renderCorrelaciones();
   renderCarreraObjetivo();
   renderRadarEstadoWidget();
-  renderIPDWidget();
   renderAcwrRendimientoWidget();
   renderSemanaQueFuncionaWidget();
 }
