@@ -44,6 +44,19 @@
   }
   .section-divider:first-child{ margin-top:0; padding-top:0; border-top:none; }
 
+  /* Secciones plegables de Stats: misma tipografía que .section-divider,
+     pero el título es un <summary> pulsable con chevron a la derecha. */
+  .stats-seccion{ margin-top:16px; border-top:1px solid var(--line); }
+  .stats-seccion summary{
+    cursor:pointer; list-style:none; padding:16px 2px 12px;
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--text-dim); display:flex; align-items:center; gap:8px;
+  }
+  .stats-seccion summary::-webkit-details-marker{ display:none; }
+  .stats-seccion summary::after{ content:'▸'; margin-left:auto; font-size:12px; transition:transform .15s; }
+  .stats-seccion[open] summary::after{ transform:rotate(90deg); }
+  .stats-seccion[open] summary{ color:var(--text); }
+
   /* Herramientas bajo demanda: el <details> nativo controla solo el
      desplegado, sin fondo propio — la .card que ya pinta cada widget por
      dentro sigue siendo la única caja visual, para no anidar dos tarjetas. */
@@ -608,25 +621,54 @@
     </div>
 
     <div class="tab-panel" id="panel-estadisticas">
+      <div class="section-divider"><span class="dot"></span> Cómo voy</div>
       <div id="vistaUnificadaWidget"></div>
-      <div id="rioTemporadaWidget"></div>
       <div id="statsWidget"></div>
-      <div id="quecambioWidget"></div>
-      <div id="comparadorMesesWidget"></div>
-      <div id="curvaPotenciaWidget"></div>
-      <div id="calibracionWidget"></div>
-      <div id="durabilityWidget"></div>
-      <div id="techoSesionWidget"></div>
-      <div id="detectorSeriesWidget"></div>
-      <div id="patronMinutoWidget"></div>
-      <div id="vamWidget"></div>
-      <div id="balanceAerobicoWidget"></div>
-      <div id="aclimatacionWidget"></div>
-      <div id="respuestaCalorWidget"></div>
-      <div id="costeTermicoWidget"></div>
-      <div id="cdaWidget"></div>
-      <div id="pruebaFijaWidget"></div>
-      <div id="rodilloCalleWidget"></div>
+
+      <details class="stats-seccion" data-seccion="cambios">
+        <summary><span class="dot"></span> Qué ha cambiado</summary>
+        <div id="quecambioWidget"></div>
+        <div id="comparadorMesesWidget"></div>
+        <div id="rioTemporadaWidget"></div>
+        <div id="vo2maxTendenciaWidget"></div>
+        <div id="vamWidget"></div>
+        <div id="balanceAerobicoWidget"></div>
+      </details>
+
+      <details class="stats-seccion" data-seccion="capacidad">
+        <summary><span class="dot"></span> Récords y capacidad</summary>
+        <div id="recordsStatsWidget"></div>
+        <div id="curvaPotenciaWidget"></div>
+        <div id="durabilityWidget"></div>
+        <div id="techoSesionWidget"></div>
+        <div id="patronMinutoWidget"></div>
+        <div id="detectorSeriesWidget"></div>
+      </details>
+
+      <details class="stats-seccion" data-seccion="bici">
+        <summary><span class="dot"></span> Bici: potencia y aerodinámica</summary>
+        <div id="pruebaFijaWidget"></div>
+        <div id="rodilloCalleWidget"></div>
+        <div id="cdaWidget"></div>
+      </details>
+
+      <details class="stats-seccion" data-seccion="calor">
+        <summary><span class="dot"></span> Calor</summary>
+        <div id="respuestaCalorWidget"></div>
+        <div id="costeTermicoWidget"></div>
+        <div id="aclimatacionWidget"></div>
+      </details>
+
+      <details class="stats-seccion" data-seccion="cuerpo">
+        <summary><span class="dot"></span> Cuerpo y material</summary>
+        <div id="dolorRodillaStatsWidget"></div>
+        <div id="zapatillasStatsWidget"></div>
+      </details>
+
+      <details class="stats-seccion" data-seccion="fiabilidad">
+        <summary><span class="dot"></span> Fiabilidad de Wattly</summary>
+        <div id="calibracionWidget"></div>
+      </details>
     </div>
 
     <div class="tab-panel" id="panel-debrief">
@@ -12381,8 +12423,52 @@ async function generarWrapped() {
 
 document.getElementById('generarWrappedBtn').addEventListener('click', generarWrapped);
 
-function renderEstadisticas() {
+// Orden = orden visual de la pestaña. Un widget nuevo de Stats se añade
+// aquí y en el HTML del panel; no hay segunda lista que mantener.
+function renderWidgetsEstadisticas() {
+  renderVistaUnificadaWidget();
+  renderQueCambioWidget();
+  renderComparadorMesesWidget();
   renderRioTemporadaWidget();
+  renderVamWidget();
+  renderBalanceAerobicoWidget();
+  renderCurvaPotenciaWidget();
+  renderDurabilityWidget();
+  renderTechoSesionWidget();
+  renderPatronMinutoWidget();
+  renderDetectorSeriesWidget();
+  renderPruebaFijaWidget();
+  renderRodilloCalleWidget();
+  renderCdAWidget();
+  renderRespuestaCalorWidget();
+  renderCosteTermicoWidget();
+  renderAclimatacionWidget();
+  renderCalibracionWidget();
+}
+
+// Secciones plegables: recuerda en este navegador cuáles dejó abiertas
+// Javi. Es comodidad de interfaz, no un dato: si el almacenamiento falla,
+// todo arranca plegado y la app sigue funcionando.
+const LS_STATS_SECCIONES_KEY = 'em_stats_secciones_abiertas';
+let seccionesStatsIniciadas = false;
+function initSeccionesStats() {
+  if (seccionesStatsIniciadas) return;
+  seccionesStatsIniciadas = true;
+  let abiertas = [];
+  try { abiertas = JSON.parse(localStorage.getItem(LS_STATS_SECCIONES_KEY) || '[]'); } catch (e) { abiertas = []; }
+  if (!Array.isArray(abiertas)) abiertas = [];
+  const secciones = document.querySelectorAll('#panel-estadisticas .stats-seccion');
+  secciones.forEach(d => {
+    d.open = abiertas.includes(d.dataset.seccion);
+    d.addEventListener('toggle', () => {
+      const ahora = [...secciones].filter(s => s.open).map(s => s.dataset.seccion);
+      try { localStorage.setItem(LS_STATS_SECCIONES_KEY, JSON.stringify(ahora)); } catch (e) { /* sin persistencia */ }
+    });
+  });
+}
+
+function renderEstadisticas() {
+  initSeccionesStats();
   const el = document.getElementById('statsWidget');
   const todas = loadSesionesMeta();
   if (!todas.length) {
@@ -12393,26 +12479,12 @@ function renderEstadisticas() {
         <button class="stats-period-btn ${statsPeriodoActual === 'año' ? 'active' : ''}" data-periodo="año">Año</button>
       </div>
       <p class="hint">Sin sesiones registradas todavía.</p>`;
+    ['recordsStatsWidget', 'vo2maxTendenciaWidget', 'dolorRodillaStatsWidget', 'zapatillasStatsWidget']
+      .forEach(id => { const c = document.getElementById(id); if (c) c.innerHTML = ''; });
     document.querySelectorAll('.stats-period-btn').forEach(btn => {
       btn.addEventListener('click', () => { statsPeriodoActual = btn.dataset.periodo; renderEstadisticas(); });
     });
-    renderQueCambioWidget();
-    renderComparadorMesesWidget();
-    renderCurvaPotenciaWidget();
-    renderCalibracionWidget();
-    renderDurabilityWidget();
-    renderTechoSesionWidget();
-    renderDetectorSeriesWidget();
-    renderPatronMinutoWidget();
-    renderVamWidget();
-    renderBalanceAerobicoWidget();
-    renderVistaUnificadaWidget();
-    renderAclimatacionWidget();
-    renderRespuestaCalorWidget();
-    renderCosteTermicoWidget();
-    renderCdAWidget();
-    renderPruebaFijaWidget();
-    renderRodilloCalleWidget();
+    renderWidgetsEstadisticas();
     return;
   }
 
@@ -12485,52 +12557,35 @@ function renderEstadisticas() {
       ${discHtml}
     </div>
 
-    ${generarHtmlRecordsHero(records)}
-
     <div class="card">
       <h3>Zona trabajada · ${LABEL_PERIODO[statsPeriodoActual]}</h3>
       ${zonaHtml}
     </div>
+  `;
 
+  // Tarjetas históricas (no dependen del periodo): cada una en su sección.
+  document.getElementById('recordsStatsWidget').innerHTML = generarHtmlRecordsHero(records);
+  document.getElementById('zapatillasStatsWidget').innerHTML = `
     <div class="card">
       <h3>👟 Zapatillas activas</h3>
       ${zapatillasHtml}
-    </div>
-
-    ${dolorSvg ? `
+    </div>`;
+  document.getElementById('dolorRodillaStatsWidget').innerHTML = dolorSvg ? `
     <div class="card">
       <h3>🦵 Evolución dolor de rodilla</h3>
       ${dolorSvg}
-    </div>` : ''}
-
-    ${vo2maxSvg ? `
+    </div>` : '';
+  document.getElementById('vo2maxTendenciaWidget').innerHTML = vo2maxSvg ? `
     <div class="card">
       <h3>🫁 Tendencia VO2max estimado</h3>
       ${vo2maxSvg}
-    </div>` : ''}
-  `;
+    </div>` : '';
 
   document.querySelectorAll('.stats-period-btn').forEach(btn => {
     btn.addEventListener('click', () => { statsPeriodoActual = btn.dataset.periodo; renderEstadisticas(); });
   });
 
-  renderQueCambioWidget();
-  renderComparadorMesesWidget();
-  renderCurvaPotenciaWidget();
-  renderCalibracionWidget();
-  renderDurabilityWidget();
-  renderTechoSesionWidget();
-  renderDetectorSeriesWidget();
-  renderPatronMinutoWidget();
-  renderVamWidget();
-  renderBalanceAerobicoWidget();
-  renderVistaUnificadaWidget();
-  renderAclimatacionWidget();
-  renderRespuestaCalorWidget();
-  renderCosteTermicoWidget();
-  renderCdAWidget();
-  renderPruebaFijaWidget();
-  renderRodilloCalleWidget();
+  renderWidgetsEstadisticas();
 }
 
 function renderVistaUnificadaWidget() {
