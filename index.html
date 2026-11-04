@@ -152,6 +152,11 @@
   .pv-tabla .gana{ color:var(--teal); } .pv-tabla .pierde{ color:var(--red); }
   .pv-sub{ font-family:'Space Grotesk',sans-serif; font-size:12.5px; margin-top:14px; color:var(--text); }
   .meteo-tag{ font-size:11.5px; color:var(--text-dim); margin-top:6px; font-family:'JetBrains Mono',monospace; }
+  .calor-fecha{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim); margin-top:10px; }
+  .calor-bloque{ margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+  .calor-bloque-tit{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text); margin-bottom:6px; }
+  .calor-bloque-tit span{ color:var(--text-dim); text-transform:none; letter-spacing:0; }
+  .calor-pie{ margin-top:12px; opacity:.75; }
   .calor-banda{ display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12px; }
   .calor-banda .lbl{ width:78px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; }
   .calor-banda .barra{ flex:1; height:14px; background:var(--surface); border-radius:7px; overflow:hidden; }
@@ -664,16 +669,10 @@
         <div id="cdaWidget"></div>
       </details>
 
-      <details class="stats-seccion" data-seccion="calor">
-        <summary><span class="dot"></span> Calor</summary>
-        <div id="respuestaCalorWidget"></div>
-        <div id="costeTermicoWidget"></div>
-        <div id="aclimatacionWidget"></div>
-      </details>
-
       <details class="stats-seccion" data-seccion="cuerpo">
-        <summary><span class="dot"></span> Cuerpo y material</summary>
+        <summary><span class="dot"></span> Cuerpo, calor y material</summary>
         <div id="dolorRodillaStatsWidget"></div>
+        <div id="calorWidget"></div>
         <div id="correlacionesWidget"></div>
         <details class="tool-details">
           <summary>⚡ Desacople cardíaco vs. dolor <span class="beta-tag">beta</span></summary>
@@ -12346,9 +12345,7 @@ function renderWidgetsEstadisticas() {
   renderPruebaFijaWidget();
   renderRodilloCalleWidget();
   renderCdAWidget();
-  renderRespuestaCalorWidget();
-  renderCosteTermicoWidget();
-  renderAclimatacionWidget();
+  renderCalorWidget();
   renderCalibracionWidget();
 }
 
@@ -13234,50 +13231,6 @@ async function calcularRespuestaCalor(sesiones) {
   return { disponible: true, bandas, n: datos.length, pendiente5, sinMeteo };
 }
 
-function renderRespuestaCalorWidget() {
-  const el = document.getElementById('respuestaCalorWidget');
-  if (!el || el.dataset.built) return;
-  el.dataset.built = '1';
-  el.innerHTML = `
-    <div class="card">
-      <h3>🥵 Cómo te afecta el calor <span class="beta-tag">beta</span></h3>
-      <p class="hint">Tu desacople cardíaco medio según la sensación térmica real (Open-Meteo) de cada carrera. Cuanto más sube con el calor, más te penaliza.</p>
-      <button class="primary-btn" id="calcularRespuestaCalorBtn" style="margin-top:10px;">Calcular</button>
-      <div id="respuestaCalorResultado" class="simulador-resultado"></div>
-    </div>`;
-  document.getElementById('calcularRespuestaCalorBtn').addEventListener('click', async (e) => {
-    const btn = e.target;
-    const resEl = document.getElementById('respuestaCalorResultado');
-    btn.disabled = true; btn.textContent = 'Calculando…'; resEl.innerHTML = '';
-    try {
-      const r = await calcularRespuestaCalor(loadSesionesMeta());
-      if (!r.disponible) { resEl.innerHTML = estadoVacioHtml(r.motivo); return; }
-      const maxAbs = Math.max(...r.bandas.map(b => Math.abs(b.media)), 1);
-      const filas = r.bandas.map(b => {
-        const color = b.media >= 8 ? 'var(--red)' : b.media >= 5 ? 'var(--amber)' : 'var(--teal)';
-        const ancho = Math.max(4, Math.round(Math.abs(b.media) / maxAbs * 100));
-        return `<div class="calor-banda"><span class="lbl">${b.lbl}</span><div class="barra"><div style="width:${ancho}%; background:${color};"></div></div><span class="val">${b.media > 0 ? '+' : ''}${b.media.toFixed(1)}% <span style="opacity:.6">(${b.n})</span></span></div>`;
-      }).join('');
-      let lectura = '';
-      if (r.pendiente5 != null) {
-        lectura = r.pendiente5 >= 1
-          ? `Por cada 5°C más de sensación térmica, tu desacople sube unos <b>${r.pendiente5} puntos</b>.`
-          : r.pendiente5 <= -1
-            ? `Curioso: con más calor tu desacople baja (${r.pendiente5} puntos cada 5°C). Puede que en días calurosos vayas más suave — mira el contexto antes de sacar conclusiones.`
-            : `El calor apenas cambia tu desacople (${r.pendiente5 > 0 ? '+' : ''}${r.pendiente5} puntos cada 5°C).`;
-      }
-      resEl.innerHTML = `${filas}
-        <p class="hint" style="margin-top:8px;">${lectura}</p>
-        <p class="hint" style="margin-top:4px; opacity:.75">${r.n} carreras con dato. Entre paréntesis, carreras por rango; solo se muestran rangos con ${RESP_CALOR_MIN_POR_BANDA} o más. El desacople también depende del ritmo y la fatiga, no solo del calor.${r.sinMeteo ? ` ${r.sinMeteo} carreras aún sin tiempo (Ajustes → Completar tiempo).` : ''}</p>`;
-    } catch (err) {
-      console.error(err);
-      resEl.innerHTML = `<p class="hint" style="color:var(--red);">Error: ${err.message}</p>`;
-    } finally {
-      btn.disabled = false; btn.textContent = 'Calcular';
-    }
-  });
-}
-
 // ---------- Rodillo ↔ calle (UI) ----------
 function _rcEtiquetaSeg(seg) { return (CP_DURACIONES.find(d => d.seg === seg) || { label: seg + ' s' }).label; }
 
@@ -13543,6 +13496,118 @@ function generarSvgCosteTermico(r) {
     </div>`;
 }
 
+// ============================================================
+// CALOR — una sola tarjeta para las tres lecturas del calor que antes
+// eran widgets separados:
+//   1. Cuánto te cuesta (coste térmico, carrera y bici): el único que
+//      cambia algo, porque fija tus umbrales personales de calor.
+//   2. Tu desacople según la temperatura (carrera): barras por rangos.
+//   3. ¿Te estás aclimatando? (carrera): primeras vs recientes.
+// Un solo botón calcula todo. El coste se guarda donde siempre (lo lee
+// umbralesCalor); los otros dos se guardan aquí para no perderlos al
+// cerrar la app. La aclimatación se calcula después del coste porque usa
+// tu umbral personal si ya es fiable.
+// ============================================================
+const LS_CALOR_RESULTADOS = 'em_calor_resultados'; // { respuesta, aclimatacion, calculado }
+function loadCalorResultados() { try { return JSON.parse(localStorage.getItem(LS_CALOR_RESULTADOS) || '{}'); } catch { return {}; } }
+function guardarCalorResultados(obj) { try { localStorage.setItem(LS_CALOR_RESULTADOS, JSON.stringify(obj)); } catch (e) { console.warn('No se pudo guardar el resultado de calor:', e.message); } }
+
+function htmlBandasCalor(r) {
+  if (!r) return '<p class="hint">Sin calcular todavía.</p>';
+  if (r.error) return `<p class="hint" style="color:var(--red);">Error: ${r.error}</p>`;
+  if (!r.disponible) return estadoVacioHtml(r.motivo);
+  const maxAbs = Math.max(...r.bandas.map(b => Math.abs(b.media)), 1);
+  const filas = r.bandas.map(b => {
+    const color = b.media >= 8 ? 'var(--red)' : b.media >= 5 ? 'var(--amber)' : 'var(--teal)';
+    const ancho = Math.max(4, Math.round(Math.abs(b.media) / maxAbs * 100));
+    return `<div class="calor-banda"><span class="lbl">${b.lbl}</span><div class="barra"><div style="width:${ancho}%; background:${color};"></div></div><span class="val">${b.media > 0 ? '+' : ''}${b.media.toFixed(1)}% <span style="opacity:.6">(${b.n})</span></span></div>`;
+  }).join('');
+  return `${filas}<p class="hint" style="margin-top:6px; opacity:.75">Desacople cardíaco medio en ${r.n} carreras; entre paréntesis, carreras por rango (solo rangos con ${RESP_CALOR_MIN_POR_BANDA} o más).</p>`;
+}
+
+function htmlAclimatacionCalor(r) {
+  if (!r) return '<p class="hint">Sin calcular todavía.</p>';
+  if (r.error) return `<p class="hint" style="color:var(--red);">Error: ${r.error}</p>`;
+  if (!r.disponible) return estadoVacioHtml(r.motivo);
+  // r.delta > 0 significa mejora (el desacople baja); en pantalla se
+  // muestra el cambio real del desacople, recientes − primeras.
+  const clase = r.delta > 1 ? 'up' : r.delta < -1 ? 'down' : 'warn';
+  const lectura = r.delta > 1
+    ? 'Tu desacople con calor ha bajado — señal de aclimatación real.'
+    : r.delta < -1
+      ? 'Tu desacople con calor ha subido — puede ser calor más intenso, fatiga acumulada, o que aún no te has aclimatado.'
+      : 'Sin cambio claro todavía.';
+  return `
+    <div class="aclimatacion-comparativa">
+      <div><div class="etiqueta">Primeras (~${r.tempMediaPrimeras}°C)</div><div class="valor">${r.mediaPrimeras}%</div></div>
+      <div class="aclimatacion-flecha">→</div>
+      <div><div class="etiqueta">Recientes (~${r.tempMediaUltimas}°C)</div><div class="valor">${r.mediaUltimas}%</div></div>
+    </div>
+    <div class="aclimatacion-delta">
+      <div class="valor ${clase}">${(() => { const c = Math.round((r.mediaUltimas - r.mediaPrimeras) * 10) / 10; return `${c > 0 ? '+' : c < 0 ? '−' : ''}${String(Math.abs(c)).replace('.', ',')} puntos`; })()}</div>
+      <p class="hint">${lectura} Carreras desde ${r.umbral}°C de sensación térmica${r.umbralPersonal ? ' (tu umbral personal)' : ''}; ${r.n} con desacople calculable.</p>
+    </div>`;
+}
+
+function pintarCalor(resEl) {
+  const coste = loadCosteTermico();
+  const otros = loadCalorResultados();
+  if (!coste.running && !coste.cycling && !otros.calculado) { resEl.innerHTML = ''; return; }
+  const fecha = otros.calculado || [coste.running?.calculado, coste.cycling?.calculado].filter(Boolean).sort().pop();
+  resEl.innerHTML = `
+    ${fecha ? `<div class="calor-fecha">Calculado el ${formatoFechaLargaRio(fecha)}</div>` : ''}
+    <div class="calor-bloque">
+      <div class="calor-bloque-tit">1 · Cuánto te cuesta</div>
+      ${htmlCosteTermicoDisciplina(coste.running, 'running')}${htmlCosteTermicoDisciplina(coste.cycling, 'cycling')}
+    </div>
+    <div class="calor-bloque">
+      <div class="calor-bloque-tit">2 · Tu desacople según la temperatura <span>· carrera</span></div>
+      ${htmlBandasCalor(otros.respuesta)}
+    </div>
+    <div class="calor-bloque">
+      <div class="calor-bloque-tit">3 · ¿Te estás aclimatando? <span>· carrera</span></div>
+      ${htmlAclimatacionCalor(otros.aclimatacion)}
+    </div>
+    <p class="hint calor-pie">La sensación térmica es la de Open-Meteo para la zona y la hora; si una carrera no la tiene, la aclimatación usa la temperatura del reloj. El desacople también depende del ritmo y de la fatiga, no solo del calor.</p>`;
+}
+
+function renderCalorWidget() {
+  const el = document.getElementById('calorWidget');
+  if (!el || el.dataset.built) return; // cálculo bajo demanda: recorre muchos tracks
+  el.dataset.built = '1';
+  const hayGuardado = (() => { const t = loadCosteTermico(); return !!(t.running || t.cycling || loadCalorResultados().calculado); })();
+  el.innerHTML = `
+    <div class="card">
+      <h3>🌡️ Calor <span class="beta-tag">beta</span></h3>
+      <p class="hint">Cuánto te penaliza el calor, a partir de qué temperatura, y si te vas aclimatando — con la sensación térmica real de cada sesión. Cuando tu umbral es fiable, los avisos de calor de la app pasan a usar el tuyo.</p>
+      <button class="primary-btn" id="calcularCalorBtn" style="margin-top:10px;">${hayGuardado ? 'Recalcular' : 'Calcular'}</button>
+      <div id="calorResultado" class="simulador-resultado"></div>
+    </div>`;
+  const resEl = document.getElementById('calorResultado');
+  pintarCalor(resEl);
+  document.getElementById('calcularCalorBtn').addEventListener('click', async (e) => {
+    const btn = e.target;
+    btn.disabled = true; btn.textContent = 'Calculando…';
+    const sesiones = loadSesionesMeta();
+    // Cada bloque falla por separado: un error en uno no borra los otros dos
+    for (const d of ['running', 'cycling']) {
+      try { guardarCosteTermico(d, await calcularCosteTermico(sesiones, d)); }
+      catch (err) { console.error('Coste térmico', d, err); }
+    }
+    const resultado = { calculado: fechaLocalStr(new Date()) };
+    try { resultado.respuesta = await calcularRespuestaCalor(sesiones); }
+    catch (err) { console.error(err); resultado.respuesta = { error: err.message }; }
+    try {
+      const u = umbralesCalor('running');
+      const a = await calcularAclimatacionCalor(sesiones);
+      resultado.aclimatacion = a.disponible ? { ...a, umbral: u.moderado, umbralPersonal: u.personal } : a;
+    } catch (err) { console.error(err); resultado.aclimatacion = { error: err.message }; }
+    guardarCalorResultados(resultado);
+    pintarCalor(resEl);
+    btn.disabled = false; btn.textContent = 'Recalcular';
+  });
+}
+
 function htmlCosteTermicoDisciplina(r, disciplina) {
   const titulo = disciplina === 'running' ? '🏃 Carrera' : '🚴 Bici';
   if (!r) return `<h4 class="ct-disciplina">${titulo}</h4><p class="hint">Sin calcular todavía.</p>`;
@@ -13574,106 +13639,11 @@ function htmlCosteTermicoDisciplina(r, disciplina) {
     `${r.n} sesiones exteriores; FC media en tramos llanos y estables de 1 min, a partir del minuto 10, llevada a ${r.pRef} W con tu propia relación pulso/potencia (${r.e > 0 ? '+' : ''}${r.e} ppm por W).`,
     r.usaCtl ? `Corregida por tu CTL del día anterior (${r.d > 0 ? '+' : ''}${r.d} ppm por punto de CTL), para que la forma no se confunda con el calor.` : 'Sin corregir por forma (CTL): tu historial aún es corto; el verano puede coincidir con más o menos forma.',
     r.descartadasArranque ? `${r.descartadasArranque} sesiones de los primeros ${CT_DIAS_ARRANQUE_CTL} días de historial no entran (su CTL aún no es fiable).` : '',
-    'La sensación térmica es de Open-Meteo (zona y hora, no tu piel): sol directo, asfalto o sombra la cambian.',
-    `Calculado el ${r.calculado}.`
+    'La sensación térmica es de Open-Meteo (zona y hora, no tu piel): sol directo, asfalto o sombra la cambian.'
   ].filter(Boolean).join(' ');
   return `<h4 class="ct-disciplina">${titulo}</h4>${cabecera}${generarSvgCosteTermico(r)}
     <p class="hint" style="margin-top:8px;">${umbrales}</p>
     <p class="hint" style="margin-top:4px; opacity:.75">${notas}</p>`;
-}
-
-function pintarCosteTermico(resEl) {
-  const todo = loadCosteTermico();
-  if (!todo.running && !todo.cycling) { resEl.innerHTML = ''; return; }
-  resEl.innerHTML = htmlCosteTermicoDisciplina(todo.running, 'running') + htmlCosteTermicoDisciplina(todo.cycling, 'cycling');
-}
-
-function renderCosteTermicoWidget() {
-  const el = document.getElementById('costeTermicoWidget');
-  if (!el || el.dataset.built) return;
-  el.dataset.built = '1';
-  const hayGuardado = (() => { const t = loadCosteTermico(); return !!(t.running || t.cycling); })();
-  el.innerHTML = `
-    <div class="card">
-      <h3>🌡️ Tu coste térmico <span class="beta-tag">beta</span></h3>
-      <p class="hint">Cuántas pulsaciones de más te cuesta cada grado de sensación térmica, al mismo esfuerzo, y a partir de qué temperatura empieza a costarte. Cuando es fiable, tus avisos de calor dejan de usar los umbrales de referencia y pasan a usar los tuyos.</p>
-      <button class="primary-btn" id="calcularCosteTermicoBtn" style="margin-top:10px;">${hayGuardado ? 'Recalcular' : 'Calcular'}</button>
-      <div id="costeTermicoResultado" class="simulador-resultado"></div>
-    </div>`;
-  const resEl = document.getElementById('costeTermicoResultado');
-  pintarCosteTermico(resEl);
-  document.getElementById('calcularCosteTermicoBtn').addEventListener('click', async (e) => {
-    const btn = e.target;
-    btn.disabled = true; btn.textContent = 'Calculando…';
-    try {
-      const sesiones = loadSesionesMeta();
-      for (const d of ['running', 'cycling']) {
-        guardarCosteTermico(d, await calcularCosteTermico(sesiones, d));
-      }
-      pintarCosteTermico(resEl);
-    } catch (err) {
-      console.error(err);
-      resEl.innerHTML = `<p class="hint" style="color:var(--red);">Error: ${err.message}</p>`;
-    } finally {
-      btn.disabled = false; btn.textContent = 'Recalcular';
-    }
-  });
-}
-
-function renderAclimatacionWidget() {
-  const el = document.getElementById('aclimatacionWidget');
-  if (!el || el.dataset.built) return; // se construye una sola vez; el cálculo es bajo demanda (recorre varios tracks, no conviene relanzarlo en cada refresco)
-  el.dataset.built = '1';
-
-  el.innerHTML = `
-    <div class="card">
-      <h3>🌡️ Aclimatación al calor <span class="beta-tag">beta</span></h3>
-      <p class="hint">Compara tu desacople cardíaco en tus primeras carreras con calor (≥${umbralesCalor('running').moderado}°C de sensación térmica${umbralesCalor('running').personal ? ', tu umbral personal' : ''}; si una carrera no tiene tiempo real, se usa la temperatura del reloj) frente a las más recientes. Si baja, tu cuerpo se ha ido acostumbrando.</p>
-      <button class="primary-btn" id="calcularAclimatacionBtn" style="margin-top:10px;">Calcular</button>
-      <div id="aclimatacionResultado" class="simulador-resultado"></div>
-    </div>
-  `;
-
-  document.getElementById('calcularAclimatacionBtn').addEventListener('click', async (e) => {
-    const btn = e.target;
-    const resEl = document.getElementById('aclimatacionResultado');
-    btn.disabled = true;
-    btn.textContent = 'Calculando…';
-    resEl.innerHTML = '';
-    try {
-      const sesiones = loadSesionesMeta();
-      const r = await calcularAclimatacionCalor(sesiones);
-      if (!r.disponible) {
-        resEl.innerHTML = `${estadoVacioHtml(r.motivo)}`;
-      } else {
-        const clase = r.delta > 1 ? 'up' : r.delta < -1 ? 'down' : 'warn';
-        const signo = r.delta > 0 ? '+' : '';
-        resEl.innerHTML = `
-          <div class="aclimatacion-comparativa">
-            <div>
-              <div class="etiqueta">Primeras (~${r.tempMediaPrimeras}°C)</div>
-              <div class="valor">${r.mediaPrimeras}%</div>
-            </div>
-            <div class="aclimatacion-flecha">→</div>
-            <div>
-              <div class="etiqueta">Recientes (~${r.tempMediaUltimas}°C)</div>
-              <div class="valor">${r.mediaUltimas}%</div>
-            </div>
-          </div>
-          <div class="aclimatacion-delta">
-            <div class="valor ${clase}">${signo}${r.delta} puntos</div>
-            <p class="hint">${r.delta > 1 ? 'Tu desacople con calor ha bajado — señal de aclimatación real.' : r.delta < -1 ? 'Tu desacople con calor ha subido — puede ser calor más intenso, fatiga acumulada, o simplemente aún no te has aclimatado.' : 'Sin cambio claro todavía.'} Basado en ${r.n} carreras con calor y desacople calculable.</p>
-          </div>
-        `;
-      }
-    } catch (err) {
-      console.error(err);
-      resEl.innerHTML = `<p class="hint" style="color:var(--red);">Error calculando la aclimatación: ${err.message}</p>`;
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Calcular';
-    }
-  });
 }
 
 function renderForma() {
