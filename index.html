@@ -560,7 +560,13 @@
   .zapatilla-item.retirada{ opacity:.55; }
 
   /* ---------- Río de temporada (streamgraph) ---------- */
-  .rio-svg{ width:100%; height:auto; margin-top:10px; display:block; }
+  .rio-svg{ width:100%; height:auto; margin-top:10px; display:block; cursor:pointer; }
+  .rio-rango{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim); margin:-2px 0 6px; }
+  .rio-meses{ position:relative; height:30px; margin-top:4px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--text-dim); }
+  .rio-meses span{ position:absolute; top:0; padding-left:3px; white-space:nowrap; line-height:1.3; }
+  .rio-meses b{ display:block; font-weight:400; font-size:9.5px; opacity:.7; }
+  .rio-detalle{ margin-top:6px; min-height:34px; font-size:12px; line-height:1.45; color:var(--text-dim); font-family:'JetBrains Mono',monospace; }
+  .rio-detalle strong{ color:var(--text); font-weight:600; }
 
   /* ---------- Iconos SVG inline (sustituyen a los emoji en los widgets
      más nuevos, para no depender del skin de emoji de cada Android) ---------- */
@@ -12059,12 +12065,24 @@ function calcularRioTemporada(sesiones) {
     if (s.rodilla.dolor_0_10 != null) entrada.dolores.push(s.rodilla.dolor_0_10);
   });
 
-  const semanas = [...porSemana.keys()].sort().map(k => {
+  // Eje temporal continuo: las semanas sin sesiones entran con carga 0
+  // (un parón se ve como un estrechamiento del río, no desaparece) y el
+  // río llega hasta la semana actual. Sin esto, las marcas de mes caerían
+  // en sitios falsos.
+  const claves = [...porSemana.keys()].sort();
+  const semanaActual = fechaLocalStr(inicioPeriodo('semana', new Date()));
+  const ultima = claves[claves.length - 1] > semanaActual ? claves[claves.length - 1] : semanaActual;
+  const todasClaves = [];
+  for (let d = new Date(claves[0] + 'T00:00:00'); fechaLocalStr(d) <= ultima; d.setDate(d.getDate() + 7)) {
+    todasClaves.push(fechaLocalStr(d));
+  }
+  const semanas = todasClaves.map(k => {
     const e = porSemana.get(k);
+    if (!e) { const tss = {}; CATEGORIAS_RIO.forEach(c => tss[c] = 0); return { semana: k, tss, dolorProm: null, vacia: true }; }
     return { semana: k, tss: e.tss, dolorProm: e.dolores.length ? e.dolores.reduce((a, b) => a + b, 0) / e.dolores.length : null };
   });
 
-  if (semanas.length < 3) return { disponible: false, motivo: `Hacen falta al menos 3 semanas con sesiones para dibujar el río (tienes ${semanas.length}).` };
+  if (claves.length < 3) return { disponible: false, motivo: `Hacen falta al menos 3 semanas con sesiones para dibujar el río (tienes ${claves.length}).` };
 
   return { disponible: true, semanas, categorias: CATEGORIAS_RIO };
 }
@@ -12086,6 +12104,52 @@ function segmentosBezier(puntos) {
     d += `C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)} `;
   }
   return d.trim();
+}
+
+const MESES_CORTOS_RIO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+// Inicio de cada mes dentro del río, con su posición en % del ancho
+// (interpolada por días, no por semana). Si hay muchos meses solo se
+// etiqueta uno de cada 2-3 para que quepan en el móvil; enero lleva año.
+function marcasMesRio(semanas) {
+  const t0 = new Date(semanas[0].semana + 'T00:00:00');
+  const diasTotal = (semanas.length - 1) * 7;
+  if (diasTotal <= 0) return [];
+  const fin = new Date(t0); fin.setDate(fin.getDate() + diasTotal);
+  const marcas = [];
+  const d = new Date(t0.getFullYear(), t0.getMonth() + 1, 1);
+  while (d <= fin) {
+    const dias = Math.round((d - t0) / 86400000);
+    marcas.push({ pct: (dias / diasTotal) * 100, mes: d.getMonth(), anio: d.getFullYear() });
+    d.setMonth(d.getMonth() + 1);
+  }
+  const paso = marcas.length <= 12 ? 1 : marcas.length <= 24 ? 2 : 3;
+  marcas.forEach((m, i) => {
+    m.etiqueta = (i % paso === 0 || m.mes === 0) ? MESES_CORTOS_RIO[m.mes] : '';
+  });
+  // Evitar que una etiqueta de enero forzada pise a la etiqueta anterior
+  let previa = -1;
+  marcas.forEach((m, i) => {
+    if (!m.etiqueta) return;
+    if (previa >= 0 && m.pct - marcas[previa].pct < 8) {
+      // Enero manda: marca el cambio de año. Si choca, cede el otro mes.
+      if (marcas[previa].mes === 0) { m.etiqueta = ''; return; }
+      marcas[previa].etiqueta = '';
+    }
+    previa = i;
+  });
+  // El año va en una segunda línea: en la primera etiqueta y en cada enero
+  let primera = true;
+  marcas.forEach(m => {
+    m.conAnio = !!m.etiqueta && (primera || m.mes === 0);
+    if (m.etiqueta) primera = false;
+  });
+  return marcas;
+}
+
+function formatoFechaLargaRio(fechaStr) {
+  const [y, m, d] = fechaStr.split('-').map(Number);
+  return `${d} ${MESES_CORTOS_RIO[m - 1]} ${y}`;
 }
 
 function generarSvgRioTemporada(datos) {
@@ -12132,14 +12196,21 @@ function generarSvgRioTemporada(datos) {
     const detalle = categorias.filter(c => s.tss[c] > 0).map(c => `${nombreCategoriaDisciplina(c)} ${Math.round(s.tss[c])}`).join(' · ') || 'sin sesiones';
     const dolorTxt = s.dolorProm != null ? ` · Dolor prom ${s.dolorProm.toFixed(1)}/10` : '';
     const anchoCol = stepX || ANCHO;
-    return `<rect x="${(i * stepX - anchoCol / 2).toFixed(1)}" y="0" width="${anchoCol.toFixed(1)}" height="${ALTO_TOTAL}" fill="transparent"><title>Semana del ${formatoFechaCorta(s.semana)}: ${detalle}${dolorTxt}</title></rect>`;
+    return `<rect data-i="${i}" x="${(i * stepX - anchoCol / 2).toFixed(1)}" y="0" width="${anchoCol.toFixed(1)}" height="${ALTO_TOTAL}" fill="transparent"><title>Semana del ${formatoFechaCorta(s.semana)}: ${detalle}${dolorTxt}</title></rect>`;
+  }).join('');
+
+  const marcasSvg = marcasMesRio(semanas).map(m => {
+    const x = (m.pct / 100 * ANCHO).toFixed(1);
+    return `<line x1="${x}" y1="0" x2="${x}" y2="${ALTO_TOTAL}" stroke="var(--text-dim)" stroke-opacity="${m.etiqueta ? 0.35 : 0.18}" stroke-width="1" vector-effect="non-scaling-stroke" />`;
   }).join('');
 
   return `
     <svg viewBox="0 0 ${ANCHO} ${ALTO_TOTAL}" class="rio-svg" preserveAspectRatio="none">
       <line x1="0" y1="${ALTO_RIO + GAP / 2}" x2="${ANCHO}" y2="${ALTO_RIO + GAP / 2}" stroke="var(--line)" stroke-width="1" />
+      ${marcasSvg}
       ${bandasSvg}
       ${dolorSvg}
+      <line class="rio-sel" x1="0" y1="0" x2="0" y2="${ALTO_TOTAL}" stroke="var(--text)" stroke-width="1.5" vector-effect="non-scaling-stroke" style="display:none" />
       ${hover}
     </svg>
   `;
@@ -12160,14 +12231,35 @@ function renderRioTemporadaWidget() {
   el.innerHTML = `
     <div class="card">
       <h3>${icono('rio')} Río de temporada</h3>
-      <p class="hint">Carga semanal por disciplina desde que empezaste a registrar en Wattly. La línea roja es tu dolor de rodilla medio esa semana — con escala propia, no está sumada al río. Pasa el dedo/ratón por encima para ver el desglose de cada semana.</p>
+      <div class="rio-rango">${formatoFechaLargaRio(datos.semanas[0].semana)} → hoy · ${datos.semanas.length} semanas</div>
+      <p class="hint">Carga semanal por disciplina desde que empezaste a registrar en Wattly. Las semanas sin sesiones cuentan como carga 0, así que un parón se ve como un estrechamiento. La línea roja es tu dolor de rodilla medio esa semana — con escala propia, no está sumada al río. Toca el río para ver el desglose de una semana.</p>
       ${generarSvgRioTemporada(datos)}
+      <div class="rio-meses">${marcasMesRio(datos.semanas).filter(m => m.etiqueta && m.pct < 94).map(m => `<span style="left:${m.pct.toFixed(2)}%">${m.etiqueta}${m.conAnio ? `<b>${m.anio}</b>` : ''}</span>`).join('')}</div>
+      <div class="rio-detalle">Toca el río para ver una semana.</div>
       <div class="pmc-chart-legend">
         ${leyendaDisciplinas}
         <span><span class="dot-legend" style="background:var(--red)"></span>Dolor rodilla (medio semanal)</span>
       </div>
     </div>
   `;
+
+  // Tocar una semana: detalle fijo debajo + línea vertical de selección
+  // (el <title> del SVG solo sirve con ratón, no en el móvil).
+  const svg = el.querySelector('.rio-svg');
+  const sel = el.querySelector('.rio-sel');
+  const detalleEl = el.querySelector('.rio-detalle');
+  svg.addEventListener('click', ev => {
+    const rect = ev.target.closest('rect[data-i]');
+    if (!rect) return;
+    const i = Number(rect.dataset.i);
+    const s = datos.semanas[i];
+    const x = Number(rect.getAttribute('x')) + Number(rect.getAttribute('width')) / 2;
+    sel.setAttribute('x1', x); sel.setAttribute('x2', x); sel.style.display = '';
+    const partes = datos.categorias.filter(c => s.tss[c] > 0).map(c => `${nombreCategoriaDisciplina(c)} ${Math.round(s.tss[c])}`);
+    const total = Math.round(datos.categorias.reduce((a, c) => a + (s.tss[c] || 0), 0));
+    const dolor = s.dolorProm != null ? ` · Dolor ${s.dolorProm.toFixed(1).replace('.', ',')}/10` : '';
+    detalleEl.innerHTML = `<strong>Semana del ${formatoFechaLargaRio(s.semana)}</strong><br>${partes.length ? partes.join(' · ') + ` · Total TSS ${total}` : 'Sin sesiones'}${dolor}`;
+  });
 }
 
 // ============================================================
