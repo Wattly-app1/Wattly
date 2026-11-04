@@ -415,6 +415,7 @@
 
   .pmc-svg{ width:100%; height:90px; display:block; margin-top:12px; }
   .pmc-chart-legend{ display:flex; gap:16px; margin-top:6px; font-size:11px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; flex-wrap:wrap; }
+  .ct-disciplina{ font-family:'Space Grotesk',sans-serif; font-size:14px; margin:16px 0 4px; padding-top:12px; border-top:1px solid var(--surface-2); }
   .dot-legend{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:middle; }
 
   .heatmap-svg{ width:100%; height:auto; display:block; }
@@ -621,6 +622,7 @@
       <div id="balanceAerobicoWidget"></div>
       <div id="aclimatacionWidget"></div>
       <div id="respuestaCalorWidget"></div>
+      <div id="costeTermicoWidget"></div>
       <div id="pruebaFijaWidget"></div>
     </div>
 
@@ -3527,12 +3529,13 @@ function calcularRupturaForma(track, opts = {}) {
 // las más recientes: si baja, te has aclimatado; el "+X puntos" es esa
 // mejora en puntos porcentuales de desacople.
 async function calcularAclimatacionCalor(sesiones) {
+  const umbralModerado = umbralesCalor('running').moderado;
   const candidatas = sesiones
-    .filter(s => categoriaDisciplina(s.tipo) === 'running' && s.tiene_track && tempCalor(s) != null && tempCalor(s) >= UMBRAL_CALOR_MODERADO)
+    .filter(s => categoriaDisciplina(s.tipo) === 'running' && s.tiene_track && tempCalor(s) != null && tempCalor(s) >= umbralModerado)
     .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
 
   if (!candidatas.length) {
-    return { disponible: false, motivo: `Todavía no tienes carreras registradas a ${UMBRAL_CALOR_MODERADO}°C o más.` };
+    return { disponible: false, motivo: `Todavía no tienes carreras registradas a ${umbralModerado}°C o más.` };
   }
 
   const conDesacople = [];
@@ -3547,7 +3550,7 @@ async function calcularAclimatacionCalor(sesiones) {
   }
 
   if (conDesacople.length < ACLIMATACION_MIN_SESIONES_CALOR) {
-    return { disponible: false, motivo: `Solo ${conDesacople.length} de tus carreras con calor (≥${UMBRAL_CALOR_MODERADO}°C) tienen desacople calculable (hace falta potencia+FC y 20+ min) — necesitas al menos ${ACLIMATACION_MIN_SESIONES_CALOR} para comparar con fiabilidad.` };
+    return { disponible: false, motivo: `Solo ${conDesacople.length} de tus carreras con calor (≥${umbralModerado}°C) tienen desacople calculable (hace falta potencia+FC y 20+ min) — necesitas al menos ${ACLIMATACION_MIN_SESIONES_CALOR} para comparar con fiabilidad.` };
   }
 
   const mitad = Math.floor(conDesacople.length / 2);
@@ -3565,6 +3568,301 @@ async function calcularAclimatacionCalor(sesiones) {
     n: conDesacople.length,
     tempMediaPrimeras: Number(mediaDe(primeras.map(x => x.temperatura)).toFixed(1)),
     tempMediaUltimas: Number(mediaDe(ultimas.map(x => x.temperatura)).toFixed(1))
+  };
+}
+
+// ============================================================
+// COSTE TÉRMICO PERSONAL
+// "Cómo te afecta el calor" mide la DERIVA dentro de una sesión (desacople).
+// Esto mide otra cosa: tu PULSO ABSOLUTO a un mismo esfuerzo según la
+// sensación térmica real (Open-Meteo), y de ahí saca tu temperatura neutra
+// (a partir de la cual el calor empieza a costarte pulsaciones) y cuántas
+// ppm te cuesta cada grado por encima. Cuando el modelo es fiable, esos
+// umbrales sustituyen a los de literatura (UMBRAL_CALOR_MODERADO/ALTO) en
+// los avisos de calor; si no, se siguen usando los de referencia.
+//
+// Decisiones de diseño:
+//  · Unidad de análisis = la SESIÓN, no el tramo: un día de calor con 300
+//    tramos no puede pesar 300 veces más que un día de frío con 20.
+//  · Tramos de 60 s, llanos (±2%), estables (CV de potencia acotado) y a
+//    partir del minuto 10 (antes la FC aún está subiendo).
+//  · FC media de cada sesión con su potencia media como covariable. Solo
+//    sesiones cuya potencia media cae a ±20% de la referencia (la mediana
+//    de todos tus tramos): nada de extrapolar. La pendiente FC/potencia NO
+//    se saca de dentro de cada sesión: con tramos de 1 min el pulso no ha
+//    terminado de reaccionar y la pendiente sale atenuada (lo destapó el
+//    banco de pruebas sintético); se estima entre sesiones, dentro del
+//    mismo modelo.
+//  · Modelo bisagra: FC = a + d·CTL + e·(P − Pref) + c·max(0, T − T0). T0
+//    se busca en rejilla de 0,5 °C. El CTL entra para que el verano no
+//    "parezca" calor cuando en realidad estabas más o menos en forma.
+//  · Incertidumbre por bootstrap de sesiones (repitiendo la búsqueda de
+//    T0 en cada remuestreo). Solo hay efecto si el IC 95% de c excluye 0;
+//    solo hay umbral personal si además el IC de T0 es estrecho.
+//  · Umbral "alto" = donde el coste supera 2× tu variación normal entre
+//    sesiones (σ residual): más allá de eso el calor ya no se confunde con
+//    un día normal. Acotado a [T0+2, T0+10] °C.
+// ============================================================
+const LS_COSTE_TERMICO = 'em_coste_termico';
+const CT_VENTANA_SEG = 60;
+const CT_DESCARTE_INICIO_SEG = 10 * 60;
+const CT_MIN_VENTANAS_SESION = 5;
+const CT_CV_MAX = { running: 0.20, cycling: 0.30 };
+const CT_MAX_CEROS = 0.10;              // fracción máxima de muestras a 0 W en un tramo (dejar de pedalear ≠ esfuerzo estable)
+const CT_MIN_DIST_VENTANA_M = 100;
+const CT_TOL_POTENCIA_REF = 0.20;
+const CT_MIN_SESIONES = 15;
+const CT_MIN_RANGO_C = 10;
+const CT_MIN_LADO_BISAGRA = 4;          // sesiones mínimas a cada lado de T0
+const CT_PASO_BISAGRA = 0.5;
+const CT_BOOTSTRAP = 300;
+const CT_IC_T0_MAX_ANCHO = 6;           // °C: más ancho que esto = umbral demasiado incierto para usarlo
+const CT_ALTO_MIN_SOBRE_T0 = 2;
+const CT_ALTO_MAX_SOBRE_T0 = 10;
+const CT_DIAS_ARRANQUE_CTL = 42;        // los primeros 42 días del historial el CTL aún está "llenándose"
+
+function _ctMedia(a) { return a.reduce((x, y) => x + y, 0) / a.length; }
+function _ctPercentil(ordenado, p) {
+  if (!ordenado.length) return null;
+  const i = (ordenado.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i);
+  return ordenado[lo] + (ordenado[hi] - ordenado[lo]) * (i - lo);
+}
+
+// Un tramo de 60 s → { pw, hr } si es llano y estable, si no null
+function evaluarVentanaCT(grupo, disciplina) {
+  const n = grupo.length;
+  if (n < 5) return null;
+  const durSeg = (grupo[n - 1].t - grupo[0].t) / 1000;
+  if (durSeg < CT_VENTANA_SEG * 0.8) return null;
+  const conHr = grupo.filter(p => p.hr != null && p.hr > 0);
+  const conPw = grupo.filter(p => p.pw != null);
+  if (conHr.length < n * 0.8 || conPw.length < n * 0.8) return null;
+  const ceros = conPw.filter(p => p.pw <= 0).length;
+  if (ceros > conPw.length * CT_MAX_CEROS) return null;
+  const pws = conPw.map(p => p.pw);
+  const pw = _ctMedia(pws);
+  if (pw <= 0) return null;
+  const sd = Math.sqrt(_ctMedia(pws.map(v => (v - pw) ** 2)));
+  if (sd / pw > (CT_CV_MAX[disciplina] ?? 0.25)) return null;
+  // llano: desnivel entre el principio y el final del tramo (media de 3 puntos en cada extremo contra el ruido del altímetro)
+  const geo = grupo.filter(p => p.lat != null && p.lon != null && p.alt != null);
+  if (geo.length < 6) return null;
+  let dist = 0;
+  for (let i = 1; i < geo.length; i++) dist += haversine(geo[i - 1].lat, geo[i - 1].lon, geo[i].lat, geo[i].lon);
+  if (dist < CT_MIN_DIST_VENTANA_M) return null;
+  const altIni = _ctMedia(geo.slice(0, 3).map(p => p.alt));
+  const altFin = _ctMedia(geo.slice(-3).map(p => p.alt));
+  if (Math.abs((altFin - altIni) / dist * 100) > LLANO_PENDIENTE_MAX_PCT) return null;
+  return { pw, hr: _ctMedia(conHr.map(p => p.hr)) };
+}
+
+function ventanasEstablesCT(points, disciplina) {
+  const pts = (points || []).filter(p => p.t != null);
+  if (pts.length < 10) return [];
+  const tInicio = pts[0].t;
+  let i = 0;
+  while (i < pts.length && (pts[i].t - tInicio) / 1000 < CT_DESCARTE_INICIO_SEG) i++;
+  const ventanas = [];
+  while (i < pts.length) {
+    const desde = pts[i].t;
+    const grupo = [pts[i]];
+    let j = i + 1, hueco = false;
+    while (j < pts.length && (pts[j].t - desde) / 1000 < CT_VENTANA_SEG) {
+      if ((pts[j].t - pts[j - 1].t) / 1000 > CP_GAP_MAX_SEG) { hueco = true; break; }
+      grupo.push(pts[j]); j++;
+    }
+    if (j >= pts.length) break;          // tramo final incompleto
+    i = j;
+    if (hueco) continue;                 // pausa: el tramo se descarta y se empieza de nuevo tras ella
+    const v = evaluarVentanaCT(grupo, disciplina);
+    if (v) ventanas.push(v);
+  }
+  return ventanas;
+}
+
+// sesiones: [{ id, fecha, x (sensación °C), ventanas: [{pw,hr}], ctl }]
+// → un punto por sesión: FC media (y) y potencia media respecto a la referencia (pw)
+function puntosSesionCT(sesiones) {
+  const validas = sesiones.filter(s => s.ventanas.length >= CT_MIN_VENTANAS_SESION);
+  if (!validas.length) return { pRef: null, puntos: [] };
+  const todas = validas.flatMap(s => s.ventanas.map(v => v.pw)).sort((a, b) => a - b);
+  const pRef = _ctPercentil(todas, 0.5);
+  const puntos = validas
+    .map(s => ({ s, pwM: _ctMedia(s.ventanas.map(v => v.pw)), hrM: _ctMedia(s.ventanas.map(v => v.hr)) }))
+    .filter(m => Math.abs(m.pwM - pRef) / pRef <= CT_TOL_POTENCIA_REF)
+    .map(m => ({ id: m.s.id, fecha: m.s.fecha, x: m.s.x, ctl: m.s.ctl, pw: m.pwM - pRef, y: m.hrM }));
+  return { pRef, puntos };
+}
+
+// Mínimos cuadrados con k columnas (sistema normal, eliminación gaussiana con pivote)
+function _ctOls(filas, ys) {
+  const k = filas[0].length;
+  const A = Array.from({ length: k }, () => new Array(k + 1).fill(0));
+  for (let r = 0; r < filas.length; r++) {
+    const f = filas[r];
+    for (let i = 0; i < k; i++) {
+      for (let j = 0; j < k; j++) A[i][j] += f[i] * f[j];
+      A[i][k] += f[i] * ys[r];
+    }
+  }
+  for (let c = 0; c < k; c++) {
+    let piv = c;
+    for (let r = c + 1; r < k; r++) if (Math.abs(A[r][c]) > Math.abs(A[piv][c])) piv = r;
+    if (Math.abs(A[piv][c]) < 1e-9) return null;
+    [A[c], A[piv]] = [A[piv], A[c]];
+    for (let r = 0; r < k; r++) {
+      if (r === c) continue;
+      const f = A[r][c] / A[c][c];
+      for (let j = c; j <= k; j++) A[r][j] -= f * A[c][j];
+    }
+  }
+  const beta = A.map((fila, i) => fila[k] / fila[i]);
+  let sse = 0;
+  filas.forEach((f, r) => { const pred = f.reduce((s, v, i) => s + v * beta[i], 0); sse += (ys[r] - pred) ** 2; });
+  return { beta, sse };
+}
+
+function ajustarBisagraCT(puntos, usarCtl) {
+  const xs = puntos.map(p => p.x);
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  const ys = puntos.map(p => p.y);
+  let mejor = null;
+  for (let t0 = Math.ceil(xMin / CT_PASO_BISAGRA) * CT_PASO_BISAGRA; t0 <= xMax; t0 += CT_PASO_BISAGRA) {
+    const encima = xs.filter(x => x > t0).length;
+    if (encima < CT_MIN_LADO_BISAGRA || xs.length - encima < CT_MIN_LADO_BISAGRA) continue;
+    const filas = puntos.map(p => usarCtl ? [1, p.ctl, p.pw, Math.max(0, p.x - t0)] : [1, p.pw, Math.max(0, p.x - t0)]);
+    const r = _ctOls(filas, ys);
+    if (r && (!mejor || r.sse < mejor.sse)) mejor = { t0, beta: r.beta, sse: r.sse };
+  }
+  if (!mejor) return null;
+  const b = mejor.beta;
+  return usarCtl
+    ? { t0: mejor.t0, a: b[0], d: b[1], e: b[2], c: b[3], sse: mejor.sse }
+    : { t0: mejor.t0, a: b[0], d: 0, e: b[1], c: b[2], sse: mejor.sse };
+}
+
+// PRNG con semilla: el mismo histórico da siempre el mismo intervalo
+function _ctPrng(semilla) {
+  let s = semilla >>> 0;
+  return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+// Núcleo puro (sin IndexedDB ni localStorage), testeable con datos sintéticos
+function modeloCosteTermico(puntosEntrada, disciplina) {
+  const base = { disciplina, calculado: fechaLocalStr(new Date()) };
+  if (puntosEntrada.length < CT_MIN_SESIONES) {
+    return { ...base, disponible: false, motivo: `Solo ${puntosEntrada.length} sesiones cumplen todo a la vez (exterior, sensación térmica real, FC+potencia, 5+ min de llano estable tras el minuto 10, potencia cerca de tu referencia). Hacen falta al menos ${CT_MIN_SESIONES}.` };
+  }
+  const xs = puntosEntrada.map(p => p.x);
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  if (xMax - xMin < CT_MIN_RANGO_C) {
+    return { ...base, disponible: false, motivo: `Tus ${puntosEntrada.length} sesiones válidas van de ${xMin.toFixed(0)} a ${xMax.toFixed(0)} °C de sensación térmica. Hace falta un rango de al menos ${CT_MIN_RANGO_C} °C para ver dónde empieza a costarte el calor.` };
+  }
+  // El CTL solo entra si queda muestra suficiente sin las sesiones del arranque del historial
+  const conCtl = puntosEntrada.filter(p => p.ctl != null);
+  const usarCtl = conCtl.length >= CT_MIN_SESIONES;
+  const puntos = usarCtl ? conCtl : puntosEntrada;
+
+  const ajuste = ajustarBisagraCT(puntos, usarCtl);
+  if (!ajuste) return { ...base, disponible: false, motivo: 'No hay suficientes sesiones a ambos lados de ninguna temperatura para ajustar el modelo.' };
+
+  const rnd = _ctPrng(puntos.length * 7919 + Math.round(xMin * 10));
+  const cs = [], t0s = [];
+  for (let b = 0; b < CT_BOOTSTRAP; b++) {
+    const muestra = puntos.map(() => puntos[Math.floor(rnd() * puntos.length)]);
+    const r = ajustarBisagraCT(muestra, usarCtl);
+    if (r) { cs.push(r.c); t0s.push(r.t0); }
+  }
+  cs.sort((a, b) => a - b); t0s.sort((a, b) => a - b);
+  const bootstrapOk = cs.length >= CT_BOOTSTRAP * 0.8;
+  const icC = bootstrapOk ? [_ctPercentil(cs, 0.025), _ctPercentil(cs, 0.975)] : null;
+  const icT0 = bootstrapOk ? [_ctPercentil(t0s, 0.025), _ctPercentil(t0s, 0.975)] : null;
+
+  const k = usarCtl ? 4 : 3;
+  const sigma = Math.sqrt(ajuste.sse / Math.max(1, puntos.length - k - 1)); // -1 extra por la búsqueda de T0
+  const efecto = !!(icC && icC[0] > 0 && ajuste.c > 0);
+  const umbralFiable = efecto && icT0 && (icT0[1] - icT0[0]) <= CT_IC_T0_MAX_ANCHO;
+
+  let alto = null;
+  if (umbralFiable) {
+    const crudo = ajuste.t0 + (2 * sigma) / ajuste.c;
+    const acotado = Math.min(ajuste.t0 + CT_ALTO_MAX_SOBRE_T0, Math.max(ajuste.t0 + CT_ALTO_MIN_SOBRE_T0, crudo));
+    alto = acotado <= xMax ? Math.round(acotado * 2) / 2 : null; // si cae fuera de lo que has vivido, no se inventa
+  }
+
+  const ctlMedio = usarCtl ? _ctMedia(puntos.map(p => p.ctl)) : null;
+  const r1 = v => v == null ? null : Math.round(v * 10) / 10;
+  return {
+    ...base,
+    disponible: true,
+    n: puntos.length,
+    usaCtl: usarCtl,
+    descartadasArranque: puntosEntrada.length - puntos.length,
+    t0: ajuste.t0,
+    c: r1(ajuste.c),
+    d: r1(ajuste.d),
+    e: Math.round(ajuste.e * 1000) / 1000,
+    a: r1(ajuste.a),
+    ctlMedio: r1(ctlMedio),
+    sigma: r1(sigma),
+    icC: icC ? icC.map(r1) : null,
+    icT0: icT0 ? icT0.map(r1) : null,
+    efecto,
+    umbralFiable,
+    moderado: umbralFiable ? ajuste.t0 : null,
+    alto,
+    xMin: r1(xMin), xMax: r1(xMax),
+    // FC llevada a tu potencia de referencia y a tu CTL medio, para pintar solo el efecto del calor
+    puntos: puntos.map(p => ({ fecha: p.fecha, x: r1(p.x), y: r1(p.y - ajuste.e * p.pw - (usarCtl ? ajuste.d * (p.ctl - ctlMedio) : 0)) }))
+  };
+}
+
+async function calcularCosteTermico(sesiones, disciplina) {
+  const exteriores = sesiones.filter(s => categoriaDisciplina(s.tipo) === disciplina && s.tiene_track && !s.es_interior);
+  const candidatas = exteriores.filter(s => s.meteo && s.meteo.sensacion_c != null);
+  const sinMeteo = exteriores.length - candidatas.length;
+  const pmc = calcularPMC(sesiones);
+  const ctlPorFecha = {};
+  pmc.serie.forEach((d, i) => { ctlPorFecha[d.fecha] = i >= CT_DIAS_ARRANQUE_CTL ? d.ctl : null; });
+
+  const conVentanas = [];
+  for (const s of candidatas) {
+    try {
+      const tr = await getTrack(s.id);
+      const ventanas = ventanasEstablesCT(tr?.points, disciplina);
+      // CTL del día anterior: el de ese mismo día ya incluye la propia sesión
+      const ayer = new Date(s.fecha + 'T00:00:00'); ayer.setDate(ayer.getDate() - 1);
+      conVentanas.push({ id: s.id, fecha: s.fecha, x: s.meteo.sensacion_c, ventanas, ctl: ctlPorFecha[fechaLocalStr(ayer)] ?? null });
+    } catch (err) { console.error('Coste térmico:', s.id, err); }
+  }
+  const ref = puntosSesionCT(conVentanas);
+  const r = modeloCosteTermico(ref.puntos, disciplina);
+  r.pRef = ref.pRef != null ? Math.round(ref.pRef) : null;
+  r.sinMeteo = sinMeteo;
+  return r;
+}
+
+function loadCosteTermico() { try { return JSON.parse(localStorage.getItem(LS_COSTE_TERMICO) || '{}'); } catch { return {}; } }
+function guardarCosteTermico(disciplina, r) {
+  const todo = loadCosteTermico();
+  todo[disciplina] = r;
+  localStorage.setItem(LS_COSTE_TERMICO, JSON.stringify(todo));
+}
+
+// Umbrales de calor vigentes para una disciplina: los tuyos si el modelo es
+// fiable, los de literatura si no. Si tu modelo da un moderado propio pero no
+// llega a ver un alto (no has vivido tanto calor), el alto es el de
+// literatura, nunca por debajo de tu moderado + 2 °C.
+function umbralesCalor(disciplina) {
+  const lit = { moderado: UMBRAL_CALOR_MODERADO, alto: UMBRAL_CALOR_ALTO, personal: false, altoPersonal: false };
+  const m = loadCosteTermico()[disciplina];
+  if (!m || !m.disponible || !m.umbralFiable || m.moderado == null) return lit;
+  return {
+    moderado: m.moderado,
+    alto: m.alto != null ? m.alto : Math.max(UMBRAL_CALOR_ALTO, m.moderado + CT_ALTO_MIN_SOBRE_T0),
+    personal: true,
+    altoPersonal: m.alto != null,
+    calculado: m.calculado
   };
 }
 
@@ -9985,11 +10283,13 @@ function renderSesiones() {
             const tInfo = tempCalorDe(sesionActual);
             const temp = tInfo ? tInfo.valor : null;
             const fuenteTxt = tInfo && tInfo.real ? 'de sensación térmica' : 'según el reloj';
+            const umb = umbralesCalor(categoriaDisciplina(sesionActual?.tipo));
+            const origenUmbral = umb.personal ? ` <span style="opacity:.7">(por encima de tu umbral de ${umb.moderado}°C)</span>` : '';
             let avisoCalor = '';
-            if (temp != null && temp >= UMBRAL_CALOR_ALTO) {
-              avisoCalor = `<p class="hint" style="margin-top:6px;">🌡️ Corriste a ${temp}°C ${fuenteTxt} — con calor así, parte de este desacople es normal (estrés térmico, no necesariamente pérdida de forma). Tómalo con cautela.</p>`;
-            } else if (temp != null && temp >= UMBRAL_CALOR_MODERADO) {
-              avisoCalor = `<p class="hint" style="margin-top:6px;">🌡️ ${temp}°C ${fuenteTxt} — algo de calor; puede estar inflando ligeramente este número.</p>`;
+            if (temp != null && temp >= umb.alto) {
+              avisoCalor = `<p class="hint" style="margin-top:6px;">🌡️ ${temp}°C ${fuenteTxt}${origenUmbral} — con calor así, parte de este desacople es normal (estrés térmico, no necesariamente pérdida de forma). Tómalo con cautela.</p>`;
+            } else if (temp != null && temp >= umb.moderado) {
+              avisoCalor = `<p class="hint" style="margin-top:6px;">🌡️ ${temp}°C ${fuenteTxt}${origenUmbral} — algo de calor; puede estar inflando ligeramente este número.</p>`;
             }
             desacopleEl.innerHTML = `<div class="desacople-card ${claseDesacople(d.desacople_pct)}">
                  <span class="desacople-label">⚡ Desacople cardíaco (potencia/FC)</span>
@@ -11564,6 +11864,7 @@ function renderEstadisticas() {
     renderVistaUnificadaWidget();
     renderAclimatacionWidget();
     renderRespuestaCalorWidget();
+    renderCosteTermicoWidget();
     renderPruebaFijaWidget();
     return;
   }
@@ -11679,6 +11980,7 @@ function renderEstadisticas() {
   renderVistaUnificadaWidget();
   renderAclimatacionWidget();
   renderRespuestaCalorWidget();
+  renderCosteTermicoWidget();
   renderPruebaFijaWidget();
 }
 
@@ -12464,6 +12766,127 @@ function renderRespuestaCalorWidget() {
   });
 }
 
+// ---------- Tu coste térmico (UI) ----------
+function generarSvgCosteTermico(r) {
+  const pts = r.puntos || [];
+  if (pts.length < 2) return '';
+  const W = 320, H = 170, mL = 30, mR = 8, mT = 10, mB = 22;
+  const x0 = Math.floor(r.xMin) - 1, x1 = Math.ceil(r.xMax) + 1;
+  const base = r.a + (r.usaCtl ? r.d * r.ctlMedio : 0);
+  const modelo = x => base + (r.efecto ? r.c * Math.max(0, x - r.t0) : 0);
+  const ys = pts.map(p => p.y).concat([modelo(x0), modelo(x1)]);
+  const y0 = Math.floor(Math.min(...ys)) - 2, y1 = Math.ceil(Math.max(...ys)) + 2;
+  const sx = x => mL + (x - x0) / (x1 - x0) * (W - mL - mR);
+  const sy = y => H - mB - (y - y0) / (y1 - y0) * (H - mT - mB);
+  let g = '';
+  // banda de incertidumbre del umbral
+  if (r.efecto && r.icT0) {
+    const a = Math.max(x0, r.icT0[0]), b = Math.min(x1, r.icT0[1]);
+    g += `<rect x="${sx(a).toFixed(1)}" y="${mT}" width="${Math.max(1, sx(b) - sx(a)).toFixed(1)}" height="${H - mT - mB}" fill="var(--amber)" opacity="0.22" />`;
+  }
+  // ejes y marcas
+  g += `<line x1="${mL}" y1="${H - mB}" x2="${W - mR}" y2="${H - mB}" stroke="var(--line)" />`;
+  for (let t = Math.ceil(x0 / 5) * 5; t <= x1; t += 5) {
+    g += `<text x="${sx(t).toFixed(1)}" y="${H - 7}" text-anchor="middle" font-size="9" fill="var(--text-dim)" font-family="JetBrains Mono, monospace">${t}°</text>`;
+  }
+  [y0 + 2, y1 - 2].forEach(v => {
+    g += `<text x="${mL - 4}" y="${(sy(v) + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-dim)" font-family="JetBrains Mono, monospace">${v}</text>`;
+    g += `<line x1="${mL}" y1="${sy(v).toFixed(1)}" x2="${W - mR}" y2="${sy(v).toFixed(1)}" stroke="var(--surface-2)" />`;
+  });
+  // sesiones
+  g += pts.map(p => `<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="3" fill="var(--teal)" opacity="0.75"><title>${p.fecha}: ${p.x}°C · ${Math.round(p.y)} ppm</title></circle>`).join('');
+  // modelo
+  if (r.efecto) {
+    const tq = Math.min(Math.max(r.t0, x0), x1);
+    g += `<polyline points="${sx(x0).toFixed(1)},${sy(modelo(x0)).toFixed(1)} ${sx(tq).toFixed(1)},${sy(modelo(tq)).toFixed(1)} ${sx(x1).toFixed(1)},${sy(modelo(x1)).toFixed(1)}" fill="none" stroke="var(--amber)" stroke-width="2" />`;
+    if (r.umbralFiable) g += `<line x1="${sx(r.t0).toFixed(1)}" y1="${mT}" x2="${sx(r.t0).toFixed(1)}" y2="${H - mB}" stroke="var(--amber)" stroke-dasharray="3 3" opacity="0.8" />`;
+  } else {
+    g += `<line x1="${sx(x0)}" y1="${sy(base).toFixed(1)}" x2="${sx(x1)}" y2="${sy(base).toFixed(1)}" stroke="var(--text-dim)" stroke-dasharray="4 3" />`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; display:block; margin-top:10px;" role="img" aria-label="Pulso a esfuerzo igual según la sensación térmica">${g}</svg>
+    <div class="pmc-chart-legend">
+      <span><span class="dot-legend" style="background:var(--teal)"></span>FC a ${r.pRef} W, cada punto una sesión</span>
+      <span><span class="dot-legend" style="background:${r.efecto ? 'var(--amber)' : 'var(--text-dim)'}"></span>${r.efecto ? 'tu modelo (banda: dónde puede empezar)' : 'nivel medio, sin efecto del calor'}</span>
+    </div>`;
+}
+
+function htmlCosteTermicoDisciplina(r, disciplina) {
+  const titulo = disciplina === 'running' ? '🏃 Carrera' : '🚴 Bici';
+  if (!r) return `<h4 class="ct-disciplina">${titulo}</h4><p class="hint">Sin calcular todavía.</p>`;
+  if (!r.disponible) {
+    const extra = r.sinMeteo ? ` ${r.sinMeteo} sesiones exteriores aún no tienen tiempo real (Ajustes → Completar tiempo).` : '';
+    return `<h4 class="ct-disciplina">${titulo}</h4>${estadoVacioHtml(r.motivo + extra)}`;
+  }
+  let cabecera;
+  if (r.efecto) {
+    cabecera = `<div class="aclimatacion-delta">
+        <div class="valor warn">+${r.c} ppm/°C</div>
+        <p class="hint">por encima de <b>${r.t0}°C</b> de sensación térmica, a ${r.pRef} W en llano.${r.icC ? ` IC 95%: ${r.icC[0]}–${r.icC[1]} ppm/°C; el punto de arranque está entre ${r.icT0[0]} y ${r.icT0[1]}°C.` : ''}</p>
+      </div>`;
+  } else {
+    cabecera = `<div class="aclimatacion-delta">
+        <div class="valor up">Sin coste visible</div>
+        <p class="hint">Entre ${r.xMin} y ${r.xMax}°C no se ve que el calor te suba el pulso a ${r.pRef} W${r.icC ? ` (el intervalo de la pendiente, ${r.icC[0]} a ${r.icC[1]} ppm/°C, incluye el cero)` : ''}. Puede cambiar cuando registres sesiones con más calor.</p>
+      </div>`;
+  }
+  let umbrales;
+  if (r.umbralFiable) {
+    umbrales = `🎯 Tus avisos de calor ${disciplina === 'running' ? 'en carrera' : 'en bici'} ya usan <b>tus umbrales</b>: algo de calor desde <b>${r.moderado}°C</b>, calor alto desde <b>${r.alto != null ? r.alto + '°C' : Math.max(UMBRAL_CALOR_ALTO, r.moderado + CT_ALTO_MIN_SOBRE_T0) + '°C'}</b>${r.alto != null ? ' (donde el coste supera el doble de tu variación normal entre sesiones)' : ' — este último sigue siendo de referencia: aún no has registrado calor suficiente para medirlo'}.`;
+  } else if (r.efecto) {
+    umbrales = `El calor te cuesta, pero el punto donde empieza aún es impreciso (más de ${CT_IC_T0_MAX_ANCHO}°C de margen), así que los avisos siguen con los umbrales de referencia (${UMBRAL_CALOR_MODERADO}/${UMBRAL_CALOR_ALTO}°C).`;
+  } else {
+    umbrales = `Los avisos de calor siguen con los umbrales de referencia (${UMBRAL_CALOR_MODERADO}/${UMBRAL_CALOR_ALTO}°C).`;
+  }
+  const notas = [
+    `${r.n} sesiones exteriores; FC media en tramos llanos y estables de 1 min, a partir del minuto 10, llevada a ${r.pRef} W con tu propia relación pulso/potencia (${r.e > 0 ? '+' : ''}${r.e} ppm por W).`,
+    r.usaCtl ? `Corregida por tu CTL del día anterior (${r.d > 0 ? '+' : ''}${r.d} ppm por punto de CTL), para que la forma no se confunda con el calor.` : 'Sin corregir por forma (CTL): tu historial aún es corto; el verano puede coincidir con más o menos forma.',
+    r.descartadasArranque ? `${r.descartadasArranque} sesiones de los primeros ${CT_DIAS_ARRANQUE_CTL} días de historial no entran (su CTL aún no es fiable).` : '',
+    'La sensación térmica es de Open-Meteo (zona y hora, no tu piel): sol directo, asfalto o sombra la cambian.',
+    `Calculado el ${r.calculado}.`
+  ].filter(Boolean).join(' ');
+  return `<h4 class="ct-disciplina">${titulo}</h4>${cabecera}${generarSvgCosteTermico(r)}
+    <p class="hint" style="margin-top:8px;">${umbrales}</p>
+    <p class="hint" style="margin-top:4px; opacity:.75">${notas}</p>`;
+}
+
+function pintarCosteTermico(resEl) {
+  const todo = loadCosteTermico();
+  if (!todo.running && !todo.cycling) { resEl.innerHTML = ''; return; }
+  resEl.innerHTML = htmlCosteTermicoDisciplina(todo.running, 'running') + htmlCosteTermicoDisciplina(todo.cycling, 'cycling');
+}
+
+function renderCosteTermicoWidget() {
+  const el = document.getElementById('costeTermicoWidget');
+  if (!el || el.dataset.built) return;
+  el.dataset.built = '1';
+  const hayGuardado = (() => { const t = loadCosteTermico(); return !!(t.running || t.cycling); })();
+  el.innerHTML = `
+    <div class="card">
+      <h3>🌡️ Tu coste térmico <span class="beta-tag">beta</span></h3>
+      <p class="hint">Cuántas pulsaciones de más te cuesta cada grado de sensación térmica, al mismo esfuerzo, y a partir de qué temperatura empieza a costarte. Cuando es fiable, tus avisos de calor dejan de usar los umbrales de referencia y pasan a usar los tuyos.</p>
+      <button class="primary-btn" id="calcularCosteTermicoBtn" style="margin-top:10px;">${hayGuardado ? 'Recalcular' : 'Calcular'}</button>
+      <div id="costeTermicoResultado" class="simulador-resultado"></div>
+    </div>`;
+  const resEl = document.getElementById('costeTermicoResultado');
+  pintarCosteTermico(resEl);
+  document.getElementById('calcularCosteTermicoBtn').addEventListener('click', async (e) => {
+    const btn = e.target;
+    btn.disabled = true; btn.textContent = 'Calculando…';
+    try {
+      const sesiones = loadSesionesMeta();
+      for (const d of ['running', 'cycling']) {
+        guardarCosteTermico(d, await calcularCosteTermico(sesiones, d));
+      }
+      pintarCosteTermico(resEl);
+    } catch (err) {
+      console.error(err);
+      resEl.innerHTML = `<p class="hint" style="color:var(--red);">Error: ${err.message}</p>`;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Recalcular';
+    }
+  });
+}
+
 function renderAclimatacionWidget() {
   const el = document.getElementById('aclimatacionWidget');
   if (!el || el.dataset.built) return; // se construye una sola vez; el cálculo es bajo demanda (recorre varios tracks, no conviene relanzarlo en cada refresco)
@@ -12472,7 +12895,7 @@ function renderAclimatacionWidget() {
   el.innerHTML = `
     <div class="card">
       <h3>🌡️ Aclimatación al calor <span class="beta-tag">beta</span></h3>
-      <p class="hint">Compara tu desacople cardíaco en tus primeras carreras con calor (≥${UMBRAL_CALOR_MODERADO}°C de sensación térmica; si una carrera no tiene tiempo real, se usa la temperatura del reloj) frente a las más recientes. Si baja, tu cuerpo se ha ido acostumbrando.</p>
+      <p class="hint">Compara tu desacople cardíaco en tus primeras carreras con calor (≥${umbralesCalor('running').moderado}°C de sensación térmica${umbralesCalor('running').personal ? ', tu umbral personal' : ''}; si una carrera no tiene tiempo real, se usa la temperatura del reloj) frente a las más recientes. Si baja, tu cuerpo se ha ido acostumbrando.</p>
       <button class="primary-btn" id="calcularAclimatacionBtn" style="margin-top:10px;">Calcular</button>
       <div id="aclimatacionResultado" class="simulador-resultado"></div>
     </div>
