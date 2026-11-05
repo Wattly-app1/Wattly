@@ -762,6 +762,7 @@
           </select>
           <input type="number" id="carreraDistanciaCustomInput" placeholder="Km" step="0.1" min="0" style="display:none;">
         </div>
+        <button class="link-btn" id="quitarCarreraBtn" type="button" style="display:none; margin:2px 0 6px;">✕ Quitar carrera</button>
         <div id="carreraWidget"></div>
         <div id="planCargaWidget"></div>
         <div id="prediccionCarreraWidget"></div>
@@ -11311,6 +11312,36 @@ carreraDistanciaCustomInputEl.addEventListener('input', () => {
     renderCarreraObjetivo();
   }
 });
+
+// ---------- Quitar carrera objetivo ----------
+// Doble toque (sin diálogos del navegador): el primero pide confirmación y
+// el segundo, dentro de 4 s, borra nombre, fecha, distancia y el registro de
+// semanas del plan. Sin carrera, Hoy vuelve a "Construir forma".
+const quitarCarreraBtnEl = document.getElementById('quitarCarreraBtn');
+let quitarCarreraArmado = null;
+function actualizarBotonQuitarCarrera() {
+  const hay = [LS_CARRERA_NOMBRE, LS_CARRERA_FECHA, LS_CARRERA_DISTANCIA].some(k => localStorage.getItem(k));
+  quitarCarreraBtnEl.style.display = hay ? 'inline-block' : 'none';
+}
+quitarCarreraBtnEl.addEventListener('click', () => {
+  if (!quitarCarreraArmado) {
+    quitarCarreraBtnEl.textContent = '¿Seguro? Toca otra vez para quitarla';
+    quitarCarreraArmado = setTimeout(() => { quitarCarreraArmado = null; quitarCarreraBtnEl.textContent = '✕ Quitar carrera'; }, 4000);
+    return;
+  }
+  clearTimeout(quitarCarreraArmado); quitarCarreraArmado = null;
+  [LS_CARRERA_NOMBRE, LS_CARRERA_FECHA, LS_CARRERA_DISTANCIA, LS_PLAN_CARGA_HIST].forEach(k => localStorage.removeItem(k));
+  carreraNombreInputEl.value = ''; carreraFechaInputEl.value = '';
+  carreraDistanciaInputEl.value = ''; carreraDistanciaCustomInputEl.value = ''; carreraDistanciaCustomInputEl.style.display = 'none';
+  quitarCarreraBtnEl.textContent = '✕ Quitar carrera';
+  actualizarBotonQuitarCarrera();
+  renderCarreraObjetivo();
+  renderQueHacerHoyWidget();
+  if (typeof renderObjetivoPronostico === 'function') renderObjetivoPronostico();
+});
+document.querySelector('.carrera-inputs').addEventListener('input', () => setTimeout(actualizarBotonQuitarCarrera, 0));
+document.querySelector('.carrera-inputs').addEventListener('change', () => setTimeout(actualizarBotonQuitarCarrera, 0));
+actualizarBotonQuitarCarrera();
 
 document.getElementById('anadirZapatillaBtn').addEventListener('click', () => {
   const nombreEl = document.getElementById('zapatillaNombreInput');
