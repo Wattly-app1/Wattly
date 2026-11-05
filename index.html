@@ -152,6 +152,15 @@
   .pv-tabla .gana{ color:var(--teal); } .pv-tabla .pierde{ color:var(--red); }
   .pv-sub{ font-family:'Space Grotesk',sans-serif; font-size:12.5px; margin-top:14px; color:var(--text); }
   .meteo-tag{ font-size:11.5px; color:var(--text-dim); margin-top:6px; font-family:'JetBrains Mono',monospace; }
+  .tsbopt-fila{ display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12px; }
+  .tsbopt-fila .lbl{ width:78px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; flex-shrink:0; }
+  .tsbopt-fila .val{ width:82px; text-align:right; font-family:'JetBrains Mono',monospace; flex-shrink:0; }
+  .tsbopt-fila.mejor .lbl, .tsbopt-fila.mejor .val{ color:var(--teal); font-weight:600; }
+  .tsbopt-fila.poco{ opacity:.55; }
+  .tsbopt-barra{ flex:1; height:14px; position:relative; background:var(--surface); border-radius:7px; overflow:hidden; }
+  .tsbopt-barra .cero{ position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--line); }
+  .tsbopt-pos{ position:absolute; left:50%; top:0; bottom:0; border-radius:0 7px 7px 0; }
+  .tsbopt-neg{ position:absolute; right:50%; top:0; bottom:0; border-radius:7px 0 0 7px; }
   .calor-fecha{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim); margin-top:10px; }
   .calor-bloque{ margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
   .calor-bloque-tit{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text); margin-bottom:6px; }
@@ -529,6 +538,37 @@
   .zapatilla-item-actions button.danger{ color:var(--red); }
   .zapatilla-item.retirada{ opacity:.55; }
 
+  /* ---------- Plan de carga (Carrera objetivo) ---------- */
+  .plan-carga{ margin-top:12px; }
+  .plan-tabla{ display:flex; flex-direction:column; gap:4px; margin-top:6px; }
+  .plan-fila{ display:grid; grid-template-columns:64px 1fr auto; gap:2px 8px; align-items:baseline; padding:7px 9px; border-radius:9px; background:var(--surface-2); font-size:12px; }
+  .plan-fila .sem{ font-family:'JetBrains Mono',monospace; color:var(--text-dim); font-size:11px; }
+  .plan-fila .tss{ font-family:'JetBrains Mono',monospace; text-align:right; }
+  .plan-fila .extra{ grid-column:2 / 4; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--text-dim); }
+  .plan-fila .extra.up{ color:var(--teal); } .plan-fila .extra.warn{ color:var(--amber); } .plan-fila .extra.down{ color:var(--red); }
+  .plan-fila.descarga{ opacity:.85; }
+  .plan-fila.taper .tipo, .plan-fila.carrera .tipo{ color:var(--teal); }
+  .plan-fila.actual{ border:1px solid var(--teal); }
+  .plan-fila.pasada{ background:transparent; border:1px dashed var(--line); }
+  .plan-fila.pasada .extra{ grid-column:auto; text-align:right; }
+  .plan-fila.pasada{ grid-template-columns:64px 1fr auto auto; }
+  .plan-progreso{ grid-column:1 / 4; height:5px; background:var(--surface); border-radius:3px; overflow:hidden; margin-top:4px; }
+  .plan-progreso > div{ height:100%; background:var(--teal); border-radius:3px; }
+  .plan-progreso-txt{ grid-column:1 / 4; margin:2px 0 0; font-size:11px; }
+
+  .constr-tsb{ font-family:'JetBrains Mono',monospace; font-size:11px; }
+  .constr-tsb.up{ color:var(--teal); } .constr-tsb.warn{ color:var(--amber); }
+
+  /* ---------- Aviso de backup (Hoy) ---------- */
+  .aviso-backup{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    padding:10px 14px; margin-bottom:14px; border-radius:12px; font-size:12.5px; line-height:1.4;
+    border:1px solid var(--amber); background:rgba(214,163,84,.08); color:var(--text);
+  }
+  .aviso-backup .link-btn{ color:var(--amber); white-space:nowrap; }
+  #avisoFtpWidget + .section-divider{ margin-top:0; padding-top:0; border-top:none; }
+  .ftp-chequeo{ margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
+
   /* ---------- Añadir sesión (Registro) ---------- */
   .importar-opciones{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:10px; }
   .importar-op{
@@ -655,6 +695,7 @@
       <details class="stats-seccion" data-seccion="capacidad">
         <summary><span class="dot"></span> Récords y capacidad</summary>
         <div id="recordsStatsWidget"></div>
+        <div id="tsbOptimoWidget"></div>
         <div id="curvaPotenciaWidget"></div>
         <div id="durabilityWidget"></div>
         <div id="techoSesionWidget"></div>
@@ -697,12 +738,15 @@
     </div>
 
     <div class="tab-panel active" id="panel-debrief">
+      <div id="avisoBackupWidget"></div>
+      <div id="avisoFtpWidget"></div>
       <div class="section-divider"><span class="dot"></span> Estado actual</div>
       <div id="queHacerHoyWidget"></div>
       <div id="resumenSemanalWidget"></div>
       <div id="formaWidget"></div>
       <div id="acwrRendimientoWidget"></div>
       <div id="radarEstadoWidget"></div>
+      <div id="construirFormaWidget"></div>
       <div class="card">
         <h3>🎯 Carrera objetivo</h3>
         <div class="carrera-inputs">
@@ -719,6 +763,7 @@
           <input type="number" id="carreraDistanciaCustomInput" placeholder="Km" step="0.1" min="0" style="display:none;">
         </div>
         <div id="carreraWidget"></div>
+        <div id="planCargaWidget"></div>
         <div id="prediccionCarreraWidget"></div>
       </div>
       <div id="modeloRiesgoWidget"></div>
@@ -791,13 +836,14 @@
 
       <div class="card">
         <h3>🚴 FTP configurado</h3>
-        <p class="hint" style="margin-bottom:10px;">El de tu último test real (o el que uses en Rouvy/Intervals.icu). Se usa como referencia para comparar contra el FTP estimado por la curva de potencia en Estadísticas.</p>
+        <p class="hint" style="margin-bottom:10px;">El de tu último test real (o el que uses en Rouvy/Intervals.icu). Se usa como referencia para comparar contra el FTP estimado por la curva de potencia en Estadísticas. Ojo: el TSS de bici no sale de aquí, lo calcula tu Garmin (o Rouvy) con el FTP que tenga configurado él — abajo ves si está al día.</p>
         <input type="number" id="ftpConfiguradoInput" placeholder="Ej. 215" min="0" step="1">
         <div style="display:flex; gap:8px;">
           <button class="primary-btn" id="saveFtpConfiguradoBtn" style="margin-bottom:0;">Guardar</button>
           <button class="primary-btn" id="clearFtpConfiguradoBtn" style="margin-bottom:0; background:var(--surface-2); color:var(--red); border:1px solid var(--line);">Borrar</button>
         </div>
         <div id="ftpConfiguradoStatus" class="status"></div>
+        <div id="ftpChequeoWidget"></div>
       </div>
 
       <div class="card">
@@ -840,6 +886,7 @@
         <label for="importInput" class="primary-btn" style="display:block; text-align:center; background:var(--surface-2); color:var(--text); border:1px solid var(--line); cursor:pointer;">⬆ Importar backup</label>
         <input type="file" id="importInput" accept="application/json" style="display:none;">
         <div id="backupStatus" class="status"></div>
+        <p class="hint" id="ultimoBackupEstado" style="margin-top:4px;"></p>
         <p class="hint" id="almacenamientoEstado" style="margin-top:8px;"></p>
         <button class="primary-btn" id="instalarAppBtn" style="display:none; margin-top:8px;">📲 Instalar Wattly en el móvil</button>
       </div>
@@ -914,6 +961,15 @@
       <div id="zapatillaFieldWrap" style="display:none;">
         <span class="field-label">Zapatilla</span>
         <div class="chip-group" data-group="zapatilla" id="zapatillaChipGroup"></div>
+      </div>
+
+      <div id="carreraTestFieldWrap" style="display:none;">
+        <span class="field-label">¿Carrera o test?</span>
+        <div class="chip-group" data-group="es_carrera">
+          <div class="chip" data-value="si">🏁 Carrera o test</div>
+          <div class="chip" data-value="no">Entreno</div>
+        </div>
+        <p class="hint" style="margin:4px 0 0;">Esfuerzo a tope en una distancia: se usa para calcular tu TSB óptimo.</p>
       </div>
 
       <span class="field-label">RPE (esfuerzo percibido)</span>
@@ -2628,6 +2684,123 @@ function calcularPrediccionRiegel(sesiones, distanciaObjetivoKm, pmcSerie = null
   };
 }
 
+// ---------- TSB óptimo personal ----------
+// ¿Con qué frescura (TSB) te salen tus mejores carreras? Sustituye al rango
+// de manual (+5/+25) igual que el coste térmico sustituye a los umbrales de
+// calor de referencia: solo cuando hay datos suficientes y la diferencia es
+// clara. Método:
+//  1. Esfuerzos: sesiones de running marcadas como "Carrera o test" (por
+//     defecto, las de RPE ≥ 9; la marca manual manda), de 3 km o más.
+//  2. Escala común: tiempo equivalente en 10K por Riegel.
+//  3. Sin el efecto de tu forma general: cada esfuerzo se compara con la
+//     mediana de tus OTROS esfuerzos en ±60 días (con el efecto de su TSB
+//     descontado, por ajuste iterativo). Así un año en mejor forma no se
+//     confunde con "mejor TSB", ni unas vecinas corridas muy cargadas hacen
+//     parecer buena cualquier carrera de al lado.
+//  4. TSB del día = el de la mañana de la carrera (CTL−ATL al cierre del día
+//     anterior), que es la frescura con la que sales a correr.
+//  5. Tramos de 10 puntos; el tramo con mejor rendimiento medio es el tuyo.
+const TSBOPT_DIST_MIN_KM = 3;
+const TSBOPT_VENTANA_DIAS = 60;
+const TSBOPT_MIN_OTROS_EN_VENTANA = 2;
+const TSBOPT_MIN_ESFUERZOS = 8;
+const TSBOPT_MIN_POR_TRAMO = 3;
+const TSBOPT_MIN_TRAMOS = 2;
+const TSBOPT_VENTAJA_MIN_PP = 1.5;   // puntos % de rendimiento que el mejor tramo debe sacar al resto
+const TSBOPT_RPE_AUTO = 9;           // sin marca manual, cuenta como carrera/test desde este RPE
+const TSBOPT_TRAMOS = [
+  { min: -Infinity, max: -20, lbl: '< −20' },
+  { min: -20, max: -10, lbl: '−20 a −10' },
+  { min: -10, max: 0,   lbl: '−10 a 0' },
+  { min: 0,   max: 10,  lbl: '0 a +10' },
+  { min: 10,  max: 20,  lbl: '+10 a +20' },
+  { min: 20,  max: 30,  lbl: '+20 a +30' },
+  { min: 30,  max: Infinity, lbl: '≥ +30' }
+];
+
+function fmtTsb(v) { return v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0'; }
+
+function esCarreraOTest(s) {
+  if (categoriaDisciplina(s.tipo) !== 'running') return false;
+  if (s.es_carrera === true || s.es_carrera === false) return s.es_carrera;
+  return (s.registro_manual?.rpe ?? 0) >= TSBOPT_RPE_AUTO;
+}
+
+function calcularTsbOptimo(sesiones) {
+  const marcadas = sesiones.filter(esCarreraOTest)
+    .filter(s => s.datos_suunto?.distancia_km >= TSBOPT_DIST_MIN_KM && s.datos_suunto?.duracion_min > 0);
+  if (!marcadas.length) {
+    return { disponible: false, n: 0, motivo: `No tienes carreras ni tests marcados. Marca "🏁 Carrera o test" al editar una sesión de running (✎ en Registro); las de RPE ≥ ${TSBOPT_RPE_AUTO} ya cuentan por defecto.` };
+  }
+  const pmc = calcularPMC(sesiones);
+  const tsbPorFecha = {};
+  pmc.serie.forEach((d, i) => { tsbPorFecha[d.fecha] = i > 0 ? pmc.serie[i - 1].tsb : 0; });
+
+  const esf = marcadas.map(s => ({
+    id: s.id, fecha: s.fecha, distanciaKm: s.datos_suunto.distancia_km,
+    eq10k: s.datos_suunto.duracion_min * Math.pow(10 / s.datos_suunto.distancia_km, RIEGEL_EXPONENTE),
+    tsb: tsbPorFecha[s.fecha] ?? null,
+    t: new Date(s.fecha + 'T00:00:00').getTime()
+  })).filter(e => e.tsb != null);
+
+  // Nivel de referencia por ajuste iterativo: si las carreras vecinas se
+  // corrieron muy cargadas, su mediana sale lenta y cualquier carrera de
+  // al lado parecería buena. Por eso, en cada vuelta, a las vecinas se les
+  // quita el efecto estimado de su tramo de TSB antes de calcular el nivel
+  // de esas semanas; luego se reestima el efecto de cada tramo. Converge
+  // en pocas vueltas. Todo en log (el rendimiento es multiplicativo).
+  const tramoDe = tsb => TSBOPT_TRAMOS.findIndex(t => tsb >= t.min && tsb < t.max);
+  esf.forEach(e => { e.logT = Math.log(e.eq10k); e.tramo = tramoDe(e.tsb); });
+  const vecinos = esf.map(e => esf.filter(o => o !== e && Math.abs(o.t - e.t) <= TSBOPT_VENTANA_DIAS * 86400000));
+  const comparables = esf.map((e, i) => vecinos[i].length >= TSBOPT_MIN_OTROS_EN_VENTANA);
+  let efecto = TSBOPT_TRAMOS.map(() => 0); // log: >0 = más rápido en ese tramo
+  let resid = esf.map(() => null);
+  for (let vuelta = 0; vuelta < 8; vuelta++) {
+    resid = esf.map((e, i) => comparables[i]
+      ? medianaDe(vecinos[i].map(o => o.logT + efecto[o.tramo])) - (e.logT + 0) : null);
+    const nuevo = TSBOPT_TRAMOS.map((_, b) => {
+      const rs = esf.map((e, i) => (e.tramo === b && resid[i] != null) ? resid[i] : null).filter(v => v != null);
+      return rs.length ? mediaDe(rs) : 0;
+    });
+    // centrado: el efecto medio ponderado es 0 (rendimiento "relativo a lo habitual")
+    const pesos = esf.map((e, i) => resid[i] != null ? nuevo[e.tramo] : null).filter(v => v != null);
+    const centro = pesos.length ? mediaDe(pesos) : 0;
+    efecto = nuevo.map(v => v - centro);
+  }
+  const conBase = esf
+    .map((e, i) => resid[i] == null ? null : { ...e, rendPct: (Math.exp(resid[i]) - 1) * 100 }) // >0: más rápido que tu nivel de esas semanas
+    .filter(Boolean);
+
+  const sinComparar = esf.length - conBase.length;
+  if (conBase.length < TSBOPT_MIN_ESFUERZOS) {
+    return { disponible: false, n: conBase.length, nMarcadas: marcadas.length, puntos: conBase,
+      motivo: `Tienes ${conBase.length} carrera${conBase.length === 1 ? '' : 's'} o test${conBase.length === 1 ? '' : 's'} comparable${conBase.length === 1 ? '' : 's'}; hacen falta ${TSBOPT_MIN_ESFUERZOS}.${sinComparar ? ` ${sinComparar} no se pueden comparar porque no tienen al menos ${TSBOPT_MIN_OTROS_EN_VENTANA} esfuerzos más en ±${TSBOPT_VENTANA_DIAS} días con los que medir tu nivel de entonces.` : ''}` };
+  }
+
+  const tramos = TSBOPT_TRAMOS.map(t => {
+    const ps = conBase.filter(e => e.tsb >= t.min && e.tsb < t.max);
+    return { ...t, n: ps.length, media: ps.length ? mediaDe(ps.map(e => e.rendPct)) : null };
+  });
+  const validos = tramos.filter(t => t.n >= TSBOPT_MIN_POR_TRAMO);
+  if (validos.length < TSBOPT_MIN_TRAMOS) {
+    return { disponible: false, n: conBase.length, puntos: conBase, tramos,
+      motivo: `Tus ${conBase.length} esfuerzos caen casi todos en el mismo tramo de TSB. Hace falta variedad: al menos ${TSBOPT_MIN_POR_TRAMO} en ${TSBOPT_MIN_TRAMOS} tramos distintos para comparar.` };
+  }
+  const mejor = validos.slice().sort((a, b) => b.media - a.media)[0];
+  const resto = conBase.filter(e => !(e.tsb >= mejor.min && e.tsb < mejor.max)).map(e => e.rendPct);
+  const ventaja = resto.length ? mejor.media - mediaDe(resto) : 0;
+  const clara = ventaja >= TSBOPT_VENTAJA_MIN_PP;
+  const acotado = Number.isFinite(mejor.min) && Number.isFinite(mejor.max) && mejor.min >= -10;
+  return {
+    disponible: true, n: conBase.length, puntos: conBase, tramos, mejor,
+    ventaja: Math.round(ventaja * 10) / 10,
+    fiable: clara && acotado,
+    motivoNoFiable: !clara
+      ? `La diferencia entre tramos es pequeña (${(Math.round(ventaja * 10) / 10).toString().replace('.', ',')} puntos; hacen falta ${String(TSBOPT_VENTAJA_MIN_PP).replace('.', ',')}): con estos datos no se distingue un TSB claramente mejor.`
+      : !acotado ? `Tu mejor tramo (${mejor.lbl}) no es un rango cerrado razonable para llegar a una carrera, así que no se usa para el taper.` : null
+  };
+}
+
 // ---------- Proyección de carrera con incertidumbre (Monte Carlo) ----------
 // El predictor Riegel+TSB de arriba da un único número, que suena a más
 // certeza de la que realmente hay. Aquí se envuelve ese mismo número en una
@@ -2788,11 +2961,25 @@ function renderPrediccionCarrera(pmcSerie = null, tsbProyectadoCarrera = null) {
       <p class="hint" style="margin-top:4px;">Basado en ${r.n} esfuerzos reales (RPE ≥ ${RIEGEL_RPE_MINIMO}). El mejor caso viene de tu ${r.mejor.origen.distanciaKm}km del ${r.mejor.origen.fecha}.</p>
     `;
 
+  // Si tu TSB óptimo es fiable: qué marca saldría llegando en su centro
+  let optimoHtml = '';
+  const rangoOpt = rangoTsbObjetivo(sesiones);
+  if (rangoOpt.personal && pmcSerie) {
+    const centro = Math.round((rangoOpt.min + rangoOpt.max) / 2);
+    const rOpt = calcularPrediccionRiegel(sesiones, distGuardada, pmcSerie, centro);
+    if (rOpt.ajustado) optimoHtml = `
+      <div class="carrera-proyeccion-row">
+        <span>Si llegas en tu TSB óptimo (${fmtTsb(centro)})</span>
+        <span class="val up">${formatoDuracionHhMm(rOpt.ajustado.minutos)} · ${formatoRitmo(rOpt.ajustado.ritmo)}</span>
+      </div>`;
+  }
+
   const ajusteHtml = r.ajustado ? `
       <div class="carrera-proyeccion-row" style="margin-top:6px; border-top:1px dashed var(--line); padding-top:6px;">
         <span>Ajustada a tu frescura proyectada ese día</span>
         <span class="val ${r.ajustado.tsbCarrera >= r.ajustado.tsbRef ? 'up' : 'warn'}">${formatoDuracionHhMm(r.ajustado.minutos)} · ${formatoRitmo(r.ajustado.ritmo)}</span>
       </div>
+      ${optimoHtml}
       <p class="hint" style="margin-top:4px;">TSB el día de tu referencia: ${r.ajustado.tsbRef > 0 ? '+' : ''}${r.ajustado.tsbRef} → TSB proyectado el día de la carrera: ${r.ajustado.tsbCarrera > 0 ? '+' : ''}${r.ajustado.tsbCarrera}. Ajuste heurístico (±10% máx.), no una ley fisiológica — tómalo como orientación, no como cifra exacta.</p>
     ` : '';
 
@@ -8385,30 +8572,38 @@ function aplicarEstandarizacion(x, stats) {
 // Regresión logística por descenso de gradiente, con regularización L2
 // (lambda alto a propósito: con pocas decenas de ejemplos, sin regularizar
 // el modelo memoriza ruido en vez de aprender un patrón real).
+// Implementación con vectores numéricos: estandariza una sola vez y
+// recorre arrays planos. Es el mismo descenso de gradiente de siempre (mismo
+// orden de operaciones, mismos lr/iters/lambda), solo que sin crear objetos
+// en cada paso — con cientos de sesiones, la versión con objetos tardaba
+// decenas de segundos dentro de la validación LOOCV y bloqueaba la app.
 function entrenarRegresionLogistica(ejemplos, stats, opts = {}) {
   const lr = opts.lr ?? 0.3;
   const iters = opts.iters ?? 400;
   const lambda = opts.lambda ?? 1.5;
   const claves = Object.keys(stats);
-  const pesos = {}; claves.forEach(k => pesos[k] = 0);
+  const m = claves.length, n = ejemplos.length;
+  const Z = new Float64Array(n * m), Y = new Float64Array(n);
+  ejemplos.forEach((ej, i) => {
+    for (let j = 0; j < m; j++) { const k = claves[j]; Z[i * m + j] = (ej.x[k] - stats[k].media) / stats[k].desv; }
+    Y[i] = ej.y;
+  });
+  const w = new Float64Array(m), g = new Float64Array(m);
   let sesgo = 0;
-  const n = ejemplos.length;
-
   for (let it = 0; it < iters; it++) {
-    let gradSesgo = 0;
-    const gradPesos = {}; claves.forEach(k => gradPesos[k] = 0);
-    ejemplos.forEach(ej => {
-      const z = aplicarEstandarizacion(ej.x, stats);
+    let gradSesgo = 0; g.fill(0);
+    for (let i = 0; i < n; i++) {
+      const off = i * m;
       let logit = sesgo;
-      claves.forEach(k => logit += pesos[k] * z[k]);
-      const pred = 1 / (1 + Math.exp(-logit));
-      const error = pred - ej.y;
+      for (let j = 0; j < m; j++) logit += w[j] * Z[off + j];
+      const error = 1 / (1 + Math.exp(-logit)) - Y[i];
       gradSesgo += error;
-      claves.forEach(k => gradPesos[k] += error * z[k]);
-    });
+      for (let j = 0; j < m; j++) g[j] += error * Z[off + j];
+    }
     sesgo -= lr * (gradSesgo / n);
-    claves.forEach(k => { pesos[k] -= lr * (gradPesos[k] / n + (lambda / n) * pesos[k]); });
+    for (let j = 0; j < m; j++) w[j] -= lr * (g[j] / n + (lambda / n) * w[j]);
   }
+  const pesos = {}; claves.forEach((k, j) => { pesos[k] = w[j]; });
   return { pesos, sesgo };
 }
 function predecirProbabilidad(modelo, x, stats) {
@@ -8441,7 +8636,23 @@ function explicarModelo(modelo) {
     .map(([k, peso]) => ({ nombre: RIESGO_NOMBRES_FEATURE[k] || k, subeRiesgo: peso > 0 }));
 }
 
+// Caché: el modelo (y su validación) solo se recalcula si cambia algo de lo
+// que usa — sesiones, RPE, dolor, carga articular, mecánica o sueño. Se
+// llama desde varios widgets en cada refresco de Hoy.
+let _cacheModeloRiesgo = { clave: null, valor: null };
+function _claveModeloRiesgo(sesiones) {
+  let raw = '';
+  try { raw = localStorage.getItem(LS_SUENO_KEY) || ''; } catch (e) { raw = ''; }
+  return sesiones.map(s => `${s.id}|${s.fecha}|${s.hora}|${s.tipo}|${s.registro_manual?.rpe}|${s.registro_manual?.carga_articular}|${s.rodilla?.dolor_0_10}|${tssEfectivo(s).valor}|${s.datos_suunto?.oscilacion_vertical_mm}|${s.datos_suunto?.tiempo_contacto_ms}`).join(';') + '#' + raw.length + ':' + raw.slice(-64);
+}
 function calcularModeloRiesgo(sesiones) {
+  const clave = _claveModeloRiesgo(sesiones);
+  if (_cacheModeloRiesgo.clave === clave) return _cacheModeloRiesgo.valor;
+  const valor = _calcularModeloRiesgoSinCache(sesiones);
+  _cacheModeloRiesgo = { clave, valor };
+  return valor;
+}
+function _calcularModeloRiesgoSinCache(sesiones) {
   const ejemplosCrudos = construirEjemplosRiesgo(sesiones);
   if (ejemplosCrudos.length < RIESGO_MIN_EJEMPLOS) {
     return { disponible: false, motivo: `Aún no hay suficientes sesiones con RPE y dolor registrados (tienes ${ejemplosCrudos.length}, hacen falta al menos ${RIESGO_MIN_EJEMPLOS}).` };
@@ -8926,6 +9137,27 @@ function calcularQueHacerHoy(sesiones) {
     const nota = sugerida.diasDesde === 0 ? 'la trabajaste hoy' : `${sugerida.diasDesde} día${sugerida.diasDesde === 1 ? '' : 's'} sin tocarla`;
     motivos.push(`${nombreCategoriaDisciplina(sugerida.cat)}: ${nota}${sugerida.riesgo ? ` (ACWR en ${sugerida.riesgo})` : ''}.`);
   }
+  // Plan de carrera: lo que queda de TSS esta semana manda sobre el objetivo de hoy
+  let tssFinal = tss;
+  const plan = (() => { try { return planActivo(sesiones); } catch (e) { console.warn('Plan de carga:', e); return null; } })();
+  const rs = restanteSemanaPlan(plan);
+  const etiquetaPlan = plan?.modo === 'construccion' ? 'Construir forma' : 'Plan de carrera';
+  if (rs && semaforo.nivel !== 'descanso') {
+    if (rs.queda <= 0) {
+      tssFinal = { min: 0, max: Math.round((pmc.actual.ctl || 0) * 0.4) };
+      motivos.push(`${etiquetaPlan}: ya has hecho el TSS de esta semana (${rs.hecho} de ${rs.objetivo}) — hoy, suave o descanso.`);
+    } else {
+      motivos.push(`${etiquetaPlan} (semana de ${rs.tipo}): te quedan ${rs.queda} TSS en ${rs.diasQuedan} día${rs.diasQuedan === 1 ? '' : 's'}, unos ${rs.porDia} por día.`);
+    }
+  }
+  // Construir forma: avisar solo si el TSB medio de la semana se sale de su rango por abajo
+  if (plan?.modo === 'construccion') {
+    const s0 = plan.semanas[0];
+    if (s0.tsbMedioReal != null && s0.tsbMedioReal < s0.rangoTsb.min) {
+      motivos.push(`TSB medio de la semana ${fmtTsb(Math.round(s0.tsbMedioReal))}, por debajo de tu rango (${fmtTsb(s0.rangoTsb.min)} a ${fmtTsb(s0.rangoTsb.max)}): no sumes más intensidad esta semana.`);
+    }
+  }
+
   evitar.forEach(d => {
     if (d.riesgo === 'alto') {
       // Si el semáforo ya ha dado el motivo por el ACWR de esta disciplina, no se repite
@@ -8935,7 +9167,7 @@ function calcularQueHacerHoy(sesiones) {
     else if ((d.dolorUltima ?? 0) >= RIESGO_DOLOR_UMBRAL) motivos.push(`Evita ${nombreCategoriaDisciplina(d.cat).toLowerCase()} — dolor de rodilla en su última sesión (${d.dolorUltima}/10).`);
   });
 
-  return { disponible: true, nivel: semaforo.nivel, textoSemaforo: semaforo.texto, disciplina: sugerida, evitar, tss, fase, motivos };
+  return { disponible: true, nivel: semaforo.nivel, textoSemaforo: semaforo.texto, disciplina: sugerida, evitar, tss: tssFinal, fase, motivos };
 }
 
 function renderQueHacerHoyWidget() {
@@ -9407,7 +9639,23 @@ function claseRiesgoProb(p) {
   return 'up';
 }
 
+// Si el modelo no está en caché, se calcula un instante después de pintar
+// el resto de Hoy: con mucho historial la validación tarda algún segundo y
+// no debe bloquear la apertura de la app.
+let _temporizadorModeloRiesgo = null;
 function renderModeloRiesgo() {
+  const el = document.getElementById('modeloRiesgoWidget');
+  if (!el) return;
+  const sesiones = loadSesionesMeta();
+  if (_cacheModeloRiesgo.clave !== _claveModeloRiesgo(sesiones)) {
+    if (!el.innerHTML) el.innerHTML = `<div class="card"><h3>🧪 Modelo de riesgo <span class="beta-tag">beta</span></h3><p class="hint">Calculando con tu historial…</p></div>`;
+    clearTimeout(_temporizadorModeloRiesgo);
+    _temporizadorModeloRiesgo = setTimeout(_renderModeloRiesgoAhora, 60);
+    return;
+  }
+  _renderModeloRiesgoAhora();
+}
+function _renderModeloRiesgoAhora() {
   const el = document.getElementById('modeloRiesgoWidget');
   if (!el) return;
   const resultado = predecirRiesgoHoy(loadSesionesMeta());
@@ -9766,6 +10014,9 @@ async function procesarFitFile(arrayBuffer, nombreFichero) {
   if (sesionMeta.es_virtual) sesionMeta.ruta_virtual = nombreRutaVirtualDeFichero(nombreFichero);
 
   const posibleDuplicado = buscarPosibleDuplicado(sesionMeta, loadSesionesMeta());
+  // Mejores 20 y 12 min de potencia, guardados ya al importar: así el aviso
+  // de FTP no tiene que releer todos los tracks cada vez.
+  if (categoriaDisciplina(sesionMeta.tipo) === 'cycling' && track.length) sesionMeta.potencia_picos = picosPotenciaDeTrack(track);
   if (sesionMeta.es_interior && categoriaDisciplina(sesionMeta.tipo) === 'cycling') {
     const pf = detectarPruebaFija(track);
     if (pf) sesionMeta.prueba_fija = pf;
@@ -10566,6 +10817,7 @@ function renderSesiones() {
           ${epocAlto ? `<span class="sensor-warn-tag" title="EPOC ${s.datos_suunto.epoc} — al menos ${EPOC_UMBRAL_MULTIPLICADOR}x tu media reciente (${Math.round(epocMediaGlobal)}, últimos ${VENTANA_ESTIMACION_DIAS} días o todo tu histórico si no hay suficientes). Esfuerzo metabólicamente muy exigente.">🔥 EPOC alto</span>` : ''}
           ${s.sensor_potencia_ausente ? `<span class="sensor-warn-tag" title="Ningún registro trajo potencia > 0 — probablemente el potenciómetro no estaba emparejado esta sesión">⚠️ Sin potencia</span>` : ''}
           ${!s.sensor_potencia_ausente && s.sensor_cadencia_ausente ? `<span class="sensor-warn-tag" title="Ningún registro trajo cadencia > 0 — probablemente el sensor de cadencia no estaba emparejado esta sesión">⚠️ Sin cadencia</span>` : ''}
+          ${esCarreraOTest(s) ? `<span class="sensor-warn-tag carrera-tag" title="Carrera o test: cuenta para tu TSB óptimo${s.es_carrera == null ? ' (marcada automáticamente por RPE ≥ ' + TSBOPT_RPE_AUTO + '; cámbialo con ✎)' : ''}">🏁 Carrera</span>` : ''}
           ${s.es_virtual ? `<span class="sensor-warn-tag" title="Sesión de Rouvy en rodillo: la ruta es virtual (sin mapa, sin tiempo, sin tramos). Distancia, desnivel, potencia, FC y cadencia cuentan en tus estadísticas.">🏠 Rouvy</span>` : ''}
           ${s.es_interior && !s.es_virtual ? `<span class="sensor-warn-tag" title="Sin coordenadas GPS — sesión de interior (rodillo/cinta). Potencia/FC/cadencia se usan igual en curva de potencia, durability y espejo.">🏠 Interior</span>` : ''}
         </div>
@@ -11025,6 +11277,7 @@ carreraNombreInputEl.addEventListener('input', () => {
 carreraFechaInputEl.addEventListener('input', () => {
   localStorage.setItem(LS_CARRERA_FECHA, carreraFechaInputEl.value);
   renderCarreraObjetivo();
+  renderQueHacerHoyWidget(); // con o sin carrera cambia el plan que manda
 });
 
 const carreraDistanciaInputEl = document.getElementById('carreraDistanciaInput');
@@ -11271,8 +11524,148 @@ document.getElementById('clearApiKeyBtn').addEventListener('click', () => {
   el.className = 'status ok';
 });
 
+// ---------- ¿Está al día el FTP de tus aparatos? ----------
+// El TSS de bici lo calcula el dispositivo (Garmin, Rouvy...) con SU FTP, y
+// Wattly lo importa tal cual. Si ese FTP se queda viejo, todo el TSS de bici
+// —y con él CTL, TSB, plan y zona productiva— sale desviado, y el error va
+// al cuadrado: TSS ∝ 1/FTP². Aquí se compara:
+//  · FTP del aparato: el que apunta el .FIT (Garmin) o, si no lo apunta, el
+//    que se deduce de la propia fórmula del TSS: FTP = NP·√(t / (36·TSS)).
+//  · FTP estimado: 95 % de tu mejor 20 min (o 93 % del mejor 12 min) de los
+//    últimos 90 días — el mismo criterio que la curva de potencia.
+// Solo se avisa en Hoy cuando el aparato tiene un FTP más BAJO que lo que
+// has demostrado (eso es un hecho medido). Si lo tiene más alto, puede que
+// simplemente no hayas apretado 20 min a tope: se cuenta en Ajustes, con
+// cautela, sin aviso.
+const FTPCHK_VENTANA_DIAS = 90;
+const FTPCHK_DISP_DIAS = 30;
+const FTPCHK_DISP_N = 5;            // mediana de las 5 salidas más recientes con dato
+const FTPCHK_UMBRAL_BAJO_PCT = 4;   // aparato por debajo de lo estimado → TSS inflado ~8 %+
+const FTPCHK_UMBRAL_ALTO_PCT = 8;
+const FTPCHK_RANGO_VALIDO = [80, 600];
+
+function picosPotenciaDeTrack(points) {
+  const tramos = segmentarTrackPotencia(points);
+  const mejor = seg => {
+    let m = null;
+    for (const t of tramos) { const v = mejorPotenciaEnTramo(t, seg); if (v != null && (m == null || v > m)) m = v; }
+    return m != null ? Math.round(m) : null;
+  };
+  return { s1200: mejor(CP_FTP_DURACION_SEG), s720: mejor(CP_FTP12_DURACION_SEG) };
+}
+
+function ftpDispositivoDeSesion(s) {
+  if (categoriaDisciplina(s.tipo) !== 'cycling') return null;
+  const d = s.datos_suunto || {};
+  if (d.ftp_dispositivo > 0) return { valor: d.ftp_dispositivo, fuente: 'fit' };
+  if (d.tss > 0 && d.potencia_normalizada > 0 && d.duracion_min > 0) {
+    const v = d.potencia_normalizada * Math.sqrt((d.duracion_min * 60) / (36 * d.tss));
+    if (v >= FTPCHK_RANGO_VALIDO[0] && v <= FTPCHK_RANGO_VALIDO[1]) return { valor: Math.round(v), fuente: 'deducido' };
+  }
+  return null;
+}
+
+function calcularChequeoFtp(sesiones, ahora = new Date()) {
+  const bici = sesiones.filter(s => categoriaDisciplina(s.tipo) === 'cycling');
+  if (!bici.length) return { estado: 'sin_bici' };
+  const desde = fechaLocalStr(new Date(ahora.getTime() - FTPCHK_VENTANA_DIAS * 86400000));
+  const enVentana = bici.filter(s => s.fecha >= desde);
+  const pendientes = enVentana.filter(s => s.tiene_track && s.potencia_picos === undefined).length;
+
+  // FTP del aparato: mediana de las salidas más recientes que lo traen o permiten deducirlo
+  const desdeDisp = fechaLocalStr(new Date(ahora.getTime() - FTPCHK_DISP_DIAS * 86400000));
+  const conDisp = bici.filter(s => s.fecha >= desdeDisp)
+    .sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora))
+    .map(s => ({ s, f: ftpDispositivoDeSesion(s) })).filter(x => x.f).slice(0, FTPCHK_DISP_N);
+  const dispositivo = conDisp.length ? {
+    valor: Math.round(medianaDe(conDisp.map(x => x.f.valor))),
+    n: conDisp.length,
+    deducido: conDisp.every(x => x.f.fuente === 'deducido'),
+    fecha: conDisp[0].s.fecha
+  } : null;
+
+  // FTP estimado por tus mejores esfuerzos
+  // 20 min manda (es el protocolo de referencia); 12 min solo si no hay ningún 20 min
+  const mejorDe = clave => enVentana.reduce((m, s) => {
+    const v = s.potencia_picos?.[clave];
+    return v != null && (!m || v > m.base) ? { base: v, fecha: s.fecha } : m;
+  }, null);
+  const m20 = mejorDe('s1200'), m12 = mejorDe('s720');
+  const estimado = m20 ? { valor: Math.round(m20.base * CP_FTP_FACTOR), via: '20 min', base: m20.base, fecha: m20.fecha }
+    : m12 ? { valor: Math.round(m12.base * CP_FTP12_FACTOR), via: '12 min', base: m12.base, fecha: m12.fecha } : null;
+
+  if (pendientes) return { estado: 'pendiente', pendientes, dispositivo, estimado };
+  if (!dispositivo) return { estado: 'sin_dispositivo', estimado };
+  if (!estimado) return { estado: 'sin_esfuerzo', dispositivo };
+  const deltaPct = Math.round((estimado.valor - dispositivo.valor) / dispositivo.valor * 1000) / 10;
+  const errorTssPct = Math.round((Math.pow(estimado.valor / dispositivo.valor, 2) - 1) * 100);
+  const estado = deltaPct >= FTPCHK_UMBRAL_BAJO_PCT ? 'bajo' : deltaPct <= -FTPCHK_UMBRAL_ALTO_PCT ? 'alto_posible' : 'ok';
+  return { estado, dispositivo, estimado, deltaPct, errorTssPct };
+}
+
+async function rellenarPicosPotencia(onProgreso) {
+  const sesiones = loadSesionesMeta();
+  const desde = fechaLocalStr(new Date(Date.now() - FTPCHK_VENTANA_DIAS * 86400000));
+  const objetivo = sesiones.filter(s => categoriaDisciplina(s.tipo) === 'cycling' && s.tiene_track && s.fecha >= desde && s.potencia_picos === undefined);
+  let hechas = 0;
+  for (const s of objetivo) {
+    try { const t = await getTrack(s.id); s.potencia_picos = picosPotenciaDeTrack(t?.points); }
+    catch (err) { console.error('Picos de potencia:', s.id, err); s.potencia_picos = { s1200: null, s720: null }; }
+    hechas++; if (onProgreso) onProgreso(hechas, objetivo.length);
+  }
+  if (objetivo.length) saveSesionesMeta(sesiones); // una sola escritura al final
+  return objetivo.length;
+}
+
+function _mayus(t) { return t ? t[0].toUpperCase() + t.slice(1) : t; }
+function textoDispositivoFtp(d) {
+  return d.deducido ? `tu aparato calcula el TSS con unos <b>${d.valor} W</b> (deducido de tus ${d.n} últimas salidas)` : `tu Garmin tiene configurado <b>${d.valor} W</b>`;
+}
+
+function renderChequeoFtp() {
+  const el = document.getElementById('ftpChequeoWidget');
+  if (!el) return;
+  const r = calcularChequeoFtp(loadSesionesMeta());
+  let html = '';
+  if (r.estado === 'sin_bici') html = '';
+  else if (r.estado === 'pendiente') html = `<p class="hint">Para comprobar si el FTP de tus aparatos está al día hace falta leer una vez ${r.pendientes} salida${r.pendientes === 1 ? '' : 's'} de bici de los últimos ${FTPCHK_VENTANA_DIAS} días. Las nuevas se miran solas al importarlas.</p><button class="primary-btn" id="rellenarPicosBtn" style="margin-top:6px;">Comprobar FTP</button><div id="rellenarPicosStatus" class="status"></div>`;
+  else if (r.estado === 'sin_dispositivo') html = `<p class="hint">Tus salidas recientes de bici no traen el FTP del aparato ni datos para deducirlo (TSS + potencia normalizada).${r.estimado ? ` Tu FTP estimado es ${r.estimado.valor} W.` : ''}</p>`;
+  else if (r.estado === 'sin_esfuerzo') html = `<p class="hint">${_mayus(textoDispositivoFtp(r.dispositivo))}, pero en ${FTPCHK_VENTANA_DIAS} días no hay ningún esfuerzo continuo de 12 o 20 min con potencia para compararlo.</p>`;
+  else {
+    const est = `tu FTP estimado es <b>${r.estimado.valor} W</b> (${r.estimado.via === '20 min' ? '95' : '93'} % de tus ${r.estimado.base} W en ${r.estimado.via} del ${formatoFechaCorta(r.estimado.fecha)})`;
+    if (r.estado === 'ok') html = `<p class="hint" style="color:var(--teal);">✓ ${_mayus(textoDispositivoFtp(r.dispositivo))} y ${est}: están de acuerdo (${r.deltaPct > 0 ? '+' : ''}${String(r.deltaPct).replace('.', ',')} %).</p>`;
+    else if (r.estado === 'bajo') html = `<p class="hint" style="color:var(--amber);">⚠️ ${_mayus(textoDispositivoFtp(r.dispositivo))}, pero ${est}. Con un FTP un ${String(r.deltaPct).replace('.', ',')} % bajo, tu TSS de bici sale un ~${r.errorTssPct} % alto, y con él tu CTL y tu fatiga. Actualiza el FTP en el Garmin (y en Rouvy si lo usas).</p>`;
+    else html = `<p class="hint">${_mayus(textoDispositivoFtp(r.dispositivo))} y ${est}, un ${String(Math.abs(r.deltaPct)).replace('.', ',')} % menos. Puede que simplemente no hayas apretado 20 min a tope en estos ${FTPCHK_VENTANA_DIAS} días; si lo has hecho, el FTP del aparato estaría alto y tu TSS de bici saldría bajo.</p>`;
+  }
+  el.innerHTML = html ? `<div class="ftp-chequeo">${html}</div>` : '';
+  const btn = document.getElementById('rellenarPicosBtn');
+  if (btn) btn.addEventListener('click', async () => {
+    const st = document.getElementById('rellenarPicosStatus');
+    btn.disabled = true;
+    try { await rellenarPicosPotencia((i, n) => { btn.textContent = `Leyendo salidas… ${i}/${n}`; }); }
+    catch (err) { console.error(err); if (st) { st.textContent = 'Error: ' + err.message; st.className = 'status err'; } }
+    renderChequeoFtp(); renderAvisoFtp();
+  });
+}
+
+function renderAvisoFtp() {
+  const el = document.getElementById('avisoFtpWidget');
+  if (!el) return;
+  const r = calcularChequeoFtp(loadSesionesMeta());
+  if (r.estado !== 'bajo') { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="aviso-backup aviso-ftp">
+      <span>🚴 El FTP de tu aparato (${r.dispositivo.valor} W) está por debajo del que has demostrado (${r.estimado.valor} W): tu TSS de bici sale un ~${r.errorTssPct} % alto. Actualízalo en el Garmin.</span>
+      <button class="link-btn" type="button" id="avisoFtpBtn">Ver</button>
+    </div>`;
+  document.getElementById('avisoFtpBtn').addEventListener('click', () => {
+    cambiarTab('ajustes');
+    setTimeout(() => document.getElementById('ftpChequeoWidget')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+  });
+}
+
 // ---------- FTP configurado ----------
 document.getElementById('ftpConfiguradoInput').value = getFtpConfigurado() || '';
+renderChequeoFtp();
 
 document.getElementById('saveFtpConfiguradoBtn').addEventListener('click', () => {
   const valor = Number(document.getElementById('ftpConfiguradoInput').value);
@@ -12337,6 +12730,7 @@ function renderWidgetsEstadisticas() {
   renderComparadorMesesWidget();
   renderVamWidget();
   renderBalanceAerobicoWidget();
+  renderTsbOptimoWidget();
   renderCurvaPotenciaWidget();
   renderDurabilityWidget();
   renderTechoSesionWidget();
@@ -13571,6 +13965,43 @@ function pintarCalor(resEl) {
     <p class="hint calor-pie">La sensación térmica es la de Open-Meteo para la zona y la hora; si una carrera no la tiene, la aclimatación usa la temperatura del reloj. El desacople también depende del ritmo y de la fatiga, no solo del calor.</p>`;
 }
 
+function renderTsbOptimoWidget() {
+  const el = document.getElementById('tsbOptimoWidget');
+  if (!el) return;
+  const r = calcularTsbOptimo(loadSesionesMeta());
+  const titulo = `<h3>🎯 Tu TSB óptimo para competir <span class="beta-tag">beta</span></h3>`;
+  const explica = `<p class="hint">Con qué frescura te salen mejor las carreras y tests, comparando cada uno con tu nivel de esas mismas semanas (no con tu mejor marca de siempre). Cuando el resultado es claro, el taper de tu carrera objetivo apunta a tu rango en vez de al de referencia (+${TSB_OBJETIVO_MIN} a +${TSB_OBJETIVO_MAX}).</p>`;
+  if (!r.disponible) {
+    el.innerHTML = `<div class="card">${titulo}${explica}${estadoVacioHtml(r.motivo)}</div>`;
+    return;
+  }
+  const conDatos = r.tramos.filter(t => t.n > 0);
+  const maxAbs = Math.max(1, ...conDatos.map(t => Math.abs(t.media)));
+  const filas = conDatos.map(t => {
+    const valido = t.n >= TSBOPT_MIN_POR_TRAMO;
+    const esMejor = t === r.mejor;
+    const color = !valido ? 'var(--surface-2)' : t.media >= 0 ? 'var(--teal)' : 'var(--amber)';
+    const ancho = Math.max(3, Math.round(Math.abs(t.media) / maxAbs * 50));
+    const barra = t.media >= 0
+      ? `<div class="tsbopt-pos" style="width:${ancho}%; background:${color};"></div>`
+      : `<div class="tsbopt-neg" style="width:${ancho}%; background:${color};"></div>`;
+    const val = `${t.media > 0 ? '+' : t.media < 0 ? '−' : ''}${Math.abs(t.media).toFixed(1).replace('.', ',')}%`;
+    return `<div class="tsbopt-fila${esMejor ? ' mejor' : ''}${valido ? '' : ' poco'}">
+      <span class="lbl">${t.lbl}</span>
+      <div class="tsbopt-barra"><span class="cero"></span>${barra}</div>
+      <span class="val">${val} <span style="opacity:.6">(${t.n})</span></span>
+    </div>`;
+  }).join('');
+  const veredicto = r.fiable
+    ? `<div class="aclimatacion-delta"><div class="valor up">TSB ${r.mejor.lbl}</div><p class="hint">Ahí rindes de media un ${r.ventaja.toString().replace('.', ',')} % mejor que en el resto de tramos. 🎯 Tu taper ya apunta a este rango.</p></div>`
+    : `<div class="aclimatacion-delta"><div class="valor warn">Sin rango claro</div><p class="hint">${r.motivoNoFiable} El taper sigue con el rango de referencia (+${TSB_OBJETIVO_MIN} a +${TSB_OBJETIVO_MAX}).</p></div>`;
+  el.innerHTML = `<div class="card">${titulo}${explica}
+    ${veredicto}
+    <div style="margin-top:10px;">${filas}</div>
+    <p class="hint" style="margin-top:8px; opacity:.75">${r.n} carreras y tests de ${TSBOPT_DIST_MIN_KM} km o más, pasados a su equivalente en 10K (Riegel). Rendimiento = cuánto más rápido o lento fuiste que tu nivel de esas semanas (mediana de tus otros esfuerzos en ±${TSBOPT_VENTANA_DIAS} días, descontando el TSB con el que se corrió cada uno). TSB = el de la mañana de la carrera. Entre paréntesis, esfuerzos por tramo; los tramos con menos de ${TSBOPT_MIN_POR_TRAMO} salen en gris y no cuentan. Cuantos menos datos, más puede pesar una carrera con viento, calor o un mal día.</p>
+  </div>`;
+}
+
 function renderCalorWidget() {
   const el = document.getElementById('calorWidget');
   if (!el || el.dataset.built) return; // cálculo bajo demanda: recorre muchos tracks
@@ -13649,6 +14080,9 @@ function htmlCosteTermicoDisciplina(r, disciplina) {
 function renderForma() {
   const sesiones = loadSesionesMeta();
   const el = document.getElementById('formaWidget');
+  renderAvisoBackup();
+  renderAvisoFtp();
+  renderChequeoFtp();
   renderResumenSemanal();
   renderRecordsPersonales();
   renderQueHacerHoyWidget();
@@ -13766,9 +14200,17 @@ const TSB_OBJETIVO_MIN = 5;   // límite inferior de una frescura razonable para
 const TSB_OBJETIVO_MAX = 25;  // por encima de esto ya se considera pérdida de forma por falta de carga
 const TAPER_MAX_DIAS_SIMULACION = 45;
 
-function claseTsbObjetivo(tsb) {
-  if (tsb >= TSB_OBJETIVO_MIN && tsb <= TSB_OBJETIVO_MAX) return 'up';
-  if (tsb < TSB_OBJETIVO_MIN - 10) return 'down';
+// Rango de TSB al que apuntar el día de la carrera: el tuyo si tu TSB
+// óptimo es fiable, el de referencia (+5/+25) si no.
+function rangoTsbObjetivo(sesiones = loadSesionesMeta()) {
+  const r = calcularTsbOptimo(sesiones);
+  if (r.disponible && r.fiable) return { min: r.mejor.min, max: r.mejor.max, personal: true, n: r.n, info: r };
+  return { min: TSB_OBJETIVO_MIN, max: TSB_OBJETIVO_MAX, personal: false, n: r.n || 0, info: r };
+}
+
+function claseTsbObjetivo(tsb, rango = rangoTsbObjetivo()) {
+  if (tsb >= rango.min && tsb <= rango.max) return 'up';
+  if (tsb < rango.min - 10) return 'down';
   return 'warn';
 }
 
@@ -13810,6 +14252,12 @@ function mediaTssDiaria(sesiones, dias) {
 }
 
 function renderCarreraObjetivo() {
+  _renderCarreraObjetivoBase();
+  renderPlanCarga();
+  renderConstruirFormaWidget();
+}
+
+function _renderCarreraObjetivoBase() {
   const el = document.getElementById('carreraWidget');
   const fechaStr = localStorage.getItem(LS_CARRERA_FECHA) || '';
   const nombre = localStorage.getItem(LS_CARRERA_NOMBRE) || '';
@@ -13886,6 +14334,7 @@ function renderCarreraObjetivo() {
           <span class="val ${deltaClase}">${projBuild.ctl} (${deltaCtl > 0 ? '+' : ''}${deltaCtl})</span>
         </div>
       </div>
+      ${lineaTsbOptimoHtml(rangoTsbObjetivo(sesiones))}
       <p class="hint" style="margin-top:6px;">Proyección basada en un modelo simplificado (TSS diario constante); es una guía orientativa, no una predicción exacta.</p>
     `;
     return;
@@ -13893,21 +14342,23 @@ function renderCarreraObjetivo() {
 
   const projManteniendo = proyectarPMC(pmc.actual.ctl, pmc.actual.atl, diasRestantes, tssMedia14d);
   const projDescanso = proyectarPMC(pmc.actual.ctl, pmc.actual.atl, diasRestantes, 0);
-  const diasTaperNecesarios = diasParaAlcanzarTSB(pmc.actual.ctl, pmc.actual.atl, TSB_OBJETIVO_MIN);
+  const rangoObj = rangoTsbObjetivo(sesiones);
+  const diasTaperNecesarios = diasParaAlcanzarTSB(pmc.actual.ctl, pmc.actual.atl, rangoObj.min);
   renderPrediccionCarrera(pmc.serie, projManteniendo.tsb);
 
-  function claseTsb(tsb) { return claseTsbObjetivo(tsb); }
+  function claseTsb(tsb) { return claseTsbObjetivo(tsb, rangoObj); }
+  const rangoTxt = `TSB ${fmtTsb(rangoObj.min)} a ${fmtTsb(rangoObj.max)}`;
 
   let recomendacion, recomendacionClase;
   if (diasTaperNecesarios == null) {
-    recomendacion = `Tu fatiga acumulada actual es alta: ni descansando del todo llegarías a una frescura cómoda (TSB +${TSB_OBJETIVO_MIN} a +${TSB_OBJETIVO_MAX}) dentro de los próximos ${TAPER_MAX_DIAS_SIMULACION} días. Vigila el volumen de aquí a la carrera.`;
+    recomendacion = `Tu fatiga acumulada actual es alta: ni descansando del todo llegarías a ${rangoObj.personal ? 'tu frescura óptima' : 'una frescura cómoda'} (${rangoTxt}) dentro de los próximos ${TAPER_MAX_DIAS_SIMULACION} días. Vigila el volumen de aquí a la carrera.`;
     recomendacionClase = 'down';
   } else if (diasTaperNecesarios === 0) {
-    recomendacion = `Ya estás en zona de frescura razonable para competir. Puedes seguir entrenando con normalidad y bajar la carga solo en los últimos días.`;
+    recomendacion = `Ya estás en ${rangoObj.personal ? 'tu zona de frescura óptima' : 'zona de frescura razonable'} para competir (${rangoTxt}). Puedes seguir entrenando con normalidad y bajar la carga solo en los últimos días.`;
     recomendacionClase = 'up';
   } else if (diasRestantes >= diasTaperNecesarios) {
     const margen = diasRestantes - diasTaperNecesarios;
-    recomendacion = `Con un taper de descanso relativo de ~${diasTaperNecesarios} día${diasTaperNecesarios === 1 ? '' : 's'} llegarías a la zona objetivo. Eso te deja ~${margen} día${margen === 1 ? '' : 's'} de margen para seguir entrenando fuerte antes de bajar la carga.`;
+    recomendacion = `Con un taper de descanso relativo de ~${diasTaperNecesarios} día${diasTaperNecesarios === 1 ? '' : 's'} llegarías a ${rangoObj.personal ? 'tu zona óptima' : 'la zona objetivo'} (${rangoTxt}). Eso te deja ~${margen} día${margen === 1 ? '' : 's'} de margen para seguir entrenando fuerte antes de bajar la carga.`;
     recomendacionClase = 'up';
   } else {
     recomendacion = `Necesitarías ~${diasTaperNecesarios} días de descanso relativo para llegar fresco, pero solo quedan ${diasRestantes}. Empieza a reducir carga cuanto antes si quieres llegar en tu mejor forma.`;
@@ -13927,8 +14378,458 @@ function renderCarreraObjetivo() {
       </div>
     </div>
     <p class="hint pmc-status ${recomendacionClase}" style="margin-top:10px;">${recomendacion}</p>
+    ${lineaTsbOptimoHtml(rangoObj)}
     <p class="hint" style="margin-top:6px;">Proyección basada en un modelo simplificado (TSS diario constante); es una guía orientativa, no una predicción exacta.</p>
   `;
+}
+
+// ============================================================
+// PLAN DE CARGA HASTA LA CARRERA — TSS semana a semana desde hoy hasta la
+// carrera objetivo. Plan VIVO: se recalcula con lo que realmente has hecho.
+//  · Construcción: el CTL sube ~PLAN_RAMPA_CTL_SEMANA por semana, sin que el
+//    ACWR (7d/28d, el mismo de toda la app) pase de PLAN_ACWR_MAX.
+//  · Descarga: 1 de cada 4 semanas, contadas HACIA ATRÁS desde el taper
+//    (así no se mueven al recalcular cada día). La semana justo antes del
+//    taper nunca es de descarga: el taper ya descarga.
+//  · Taper: carga reducida (PLAN_TAPER_PCT), con la duración mínima que te
+//    deja la mañana de la carrera dentro de tu rango de TSB (el personal si
+//    es fiable, el de referencia si no).
+//  · Running: mínimo semanal = tu reparto reciente, sin pasar de un ACWR de
+//    running de PLAN_ACWR_MAX — para no cumplir el plan solo con bici.
+// Para ver cuánto lo cumples, el objetivo de cada semana se guarda la
+// primera vez que se calcula (por carrera) y ya no cambia.
+// ============================================================
+const PLAN_RAMPA_CTL_SEMANA = 3;
+const PLAN_CICLO_SEMANAS = 4;        // 3 de carga + 1 de descarga
+const PLAN_DESCARGA_PCT = 0.6;
+const PLAN_TAPER_PCT = 0.45;
+const PLAN_ACWR_MAX = 1.3;
+const PLAN_TAPER_MIN_DIAS = 3;
+const PLAN_TAPER_MAX_DIAS = 21;
+const PLAN_MIN_DIAS_HISTORIAL = 28;
+const PLAN_MIN_DIAS_CARRERA = 8;
+const PLAN_MARGEN = 0.05;            // el objetivo se muestra como ±5 %
+const PLAN_RUN_VENTANA_DIAS = 42;
+const LS_PLAN_CARGA_HIST = 'em_plan_carga_historial'; // { "<fecha carrera>": { "<lunes>": objetivo } }
+
+function _sumarDias(fechaStr, n) { const d = new Date(fechaStr + 'T00:00:00'); d.setDate(d.getDate() + n); return fechaLocalStr(d); }
+function _tssRunPorDia(sesiones) {
+  const porDia = {};
+  sesiones.filter(s => categoriaDisciplina(s.tipo) === 'running')
+    .forEach(s => { porDia[s.fecha] = (porDia[s.fecha] || 0) + (tssEfectivo(s).valor || 0); });
+  return porDia;
+}
+function _sumaRango(porDia, desde, dias) {
+  let t = 0; for (let i = 0; i < dias; i++) t += porDia[_sumarDias(desde, i)] || 0; return t;
+}
+function _topeAcwr(sumaTresPrevias) {
+  // ACWR al cerrar la semana = (W/7) / ((W + 3 previas)/28) ≤ max  →  W ≤ max·S3/(4−max)
+  return sumaTresPrevias > 0 ? PLAN_ACWR_MAX * sumaTresPrevias / (4 - PLAN_ACWR_MAX) : Infinity;
+}
+
+function calcularPlanCarga(sesiones, fechaCarreraStr, rango, ahora = new Date()) {
+  if (!fechaCarreraStr) return { disponible: false, motivo: null };
+  const hoyStr = fechaLocalStr(ahora);
+  const diasHasta = Math.round((new Date(fechaCarreraStr + 'T00:00:00') - new Date(hoyStr + 'T00:00:00')) / 86400000);
+  if (diasHasta < PLAN_MIN_DIAS_CARRERA) return { disponible: false, motivo: diasHasta < 0 ? null : 'A menos de una semana de la carrera ya no hay plan que hacer: sigue la proyección del taper de arriba.' };
+  const { porDia, primeraFecha } = construirSerieTssDiario(sesiones);
+  if (!primeraFecha) return { disponible: false, motivo: 'Sin sesiones todavía.' };
+  const diasHistorial = Math.round((new Date(hoyStr + 'T00:00:00') - new Date(primeraFecha + 'T00:00:00')) / 86400000);
+  if (diasHistorial < PLAN_MIN_DIAS_HISTORIAL) return { disponible: false, motivo: `Hacen falta al menos ${PLAN_MIN_DIAS_HISTORIAL} días de historial para planificar sin pasarse de carga (tienes ${diasHistorial}).` };
+
+  const porDiaRun = _tssRunPorDia(sesiones);
+  const lunes0 = fechaLocalStr(inicioPeriodo('semana', new Date(hoyStr + 'T00:00:00')));
+  const ultimoDia = _sumarDias(fechaCarreraStr, -1); // el plan acaba el día antes de la carrera
+  const pmc = calcularPMC(sesiones, new Date(_sumarDias(lunes0, -1) + 'T00:00:00'));
+  const ctl0 = pmc.actual.ctl || 0, atl0 = pmc.actual.atl || 0;
+
+  const totRec = _sumaRango(porDia, _sumarDias(hoyStr, -PLAN_RUN_VENTANA_DIAS), PLAN_RUN_VENTANA_DIAS);
+  const runRec = _sumaRango(porDiaRun, _sumarDias(hoyStr, -PLAN_RUN_VENTANA_DIAS), PLAN_RUN_VENTANA_DIAS);
+  const cuotaRun = totRec > 0 ? runRec / totRec : 0;
+
+  // Semanas del plan (lunes a domingo), recortadas al día antes de la carrera
+  const semanas = [];
+  for (let l = lunes0; l <= ultimoDia; l = _sumarDias(l, 7)) {
+    const dias = []; for (let i = 0; i < 7; i++) { const f = _sumarDias(l, i); if (f <= ultimoDia) dias.push(f); }
+    semanas.push({ lunes: l, dias });
+  }
+  const a = Math.pow(1 - 1 / CTL_DIAS, 7);
+
+  // Construye el plan para una duración de taper dada y lo simula día a día
+  function construir(taperDias) {
+    const inicioTaper = _sumarDias(fechaCarreraStr, -taperDias);
+    const semTaper = semanas.findIndex(s => s.dias.some(f => f >= inicioTaper));
+    let ctl = ctl0, atl = atl0;
+    const totales = { [_sumarDias(lunes0, -7)]: _sumaRango(porDia, _sumarDias(lunes0, -7), 7), [_sumarDias(lunes0, -14)]: _sumaRango(porDia, _sumarDias(lunes0, -14), 7), [_sumarDias(lunes0, -21)]: _sumaRango(porDia, _sumarDias(lunes0, -21), 7) };
+    const totalesRun = { [_sumarDias(lunes0, -7)]: _sumaRango(porDiaRun, _sumarDias(lunes0, -7), 7), [_sumarDias(lunes0, -14)]: _sumaRango(porDiaRun, _sumarDias(lunes0, -14), 7), [_sumarDias(lunes0, -21)]: _sumaRango(porDiaRun, _sumarDias(lunes0, -21), 7) };
+    let ultimaCarga = null, cargaDiariaPreTaper = null;
+    const out = semanas.map((s, k) => {
+      const s3 = [1, 2, 3].reduce((t, j) => t + (totales[_sumarDias(s.lunes, -7 * j)] || 0), 0);
+      const s3run = [1, 2, 3].reduce((t, j) => t + (totalesRun[_sumarDias(s.lunes, -7 * j)] || 0), 0);
+      const semanasAntesTaper = semTaper - k; // 1 = la semana justo antes del taper
+      let tipo = 'carga';
+      if (k >= semTaper) tipo = k === semanas.length - 1 ? 'carrera' : 'taper';
+      else if (semanasAntesTaper > 1 && semanasAntesTaper % PLAN_CICLO_SEMANAS === 0) tipo = 'descarga';
+
+      // carga diaria de construcción para subir el CTL la rampa prevista
+      let diaria = Math.max(0, ctl + PLAN_RAMPA_CTL_SEMANA / (1 - a));
+      let objetivo7 = diaria * 7;
+      if (tipo === 'descarga') objetivo7 = (ultimaCarga ?? s3 / 3) * PLAN_DESCARGA_PCT; // sin carga planificada antes: 60 % de lo que venías haciendo
+      const tope = _topeAcwr(s3);
+      let limitadoAcwr = false;
+      if (objetivo7 > tope) { objetivo7 = tope; limitadoAcwr = true; }
+      if (tipo === 'carga') ultimaCarga = objetivo7;
+      if (cargaDiariaPreTaper == null || k < semTaper) cargaDiariaPreTaper = objetivo7 / 7;
+
+      // reparto por días del plan
+      const cargasPlan = s.dias.map(f => f >= inicioTaper ? cargaDiariaPreTaper * PLAN_TAPER_PCT : objetivo7 / 7);
+      const objetivoPlan = Math.round(cargasPlan.reduce((t, v) => t + v, 0));
+      // semana actual: los días pasados son los reales y lo que falte se
+      // reparte entre los que quedan (si ya te has pasado, quedan a 0)
+      let cargas = cargasPlan.slice(), hechoAntes = 0;
+      if (k === 0) {
+        hechoAntes = s.dias.filter(f => f < hoyStr).reduce((t, f) => t + (porDia[f] || 0), 0);
+        const idxQuedan = s.dias.map((f, i) => f >= hoyStr ? i : -1).filter(i => i >= 0);
+        const planQuedan = idxQuedan.reduce((t, i) => t + cargasPlan[i], 0);
+        const queda = Math.max(0, objetivoPlan - hechoAntes);
+        cargas = s.dias.map((f, i) => f < hoyStr ? (porDia[f] || 0) : (planQuedan > 0 ? cargasPlan[i] * queda / planQuedan : 0));
+      }
+
+      cargas.forEach(L => { ctl = ctl + (L - ctl) / CTL_DIAS; atl = atl + (L - atl) / ATL_DIAS; });
+      const total = cargas.reduce((t, v) => t + v, 0);
+      totales[s.lunes] = total;
+      const topeRun = _topeAcwr(s3run);
+      let runMin = Math.round(Math.min(cuotaRun * objetivoPlan, topeRun === Infinity ? cuotaRun * objetivoPlan : topeRun));
+      totalesRun[s.lunes] = runMin;
+      return { lunes: s.lunes, dias: s.dias.length, tipo, objetivo: objetivoPlan, runMin, limitadoAcwr,
+        ctlFin: Number(ctl.toFixed(1)), tsbFin: Number((ctl - atl).toFixed(1)), esActual: k === 0, hechoAntesHoy: k === 0 ? Math.round(hechoAntes) : null,
+        hecho: k === 0 ? Math.round(_sumaRango(porDia, s.lunes, s.dias.length)) : null };
+    });
+    return { semanas: out, tsbCarrera: Number((ctl - atl).toFixed(1)), ctlCarrera: Number(ctl.toFixed(1)), taperDias, inicioTaper };
+  }
+
+  let elegido = null;
+  const maxTaper = Math.min(PLAN_TAPER_MAX_DIAS, diasHasta - 1);
+  for (let t = Math.min(PLAN_TAPER_MIN_DIAS, maxTaper); t <= maxTaper; t++) {
+    const p = construir(t);
+    if (p.tsbCarrera >= rango.min) { elegido = p; break; }
+  }
+  const alcanza = !!elegido;
+  if (!elegido) elegido = construir(maxTaper);
+
+  // Objetivos congelados por semana, para ver cuánto se cumple
+  let hist = {};
+  try { hist = JSON.parse(localStorage.getItem(LS_PLAN_CARGA_HIST) || '{}'); } catch (e) { hist = {}; }
+  const delaCarrera = hist[fechaCarreraStr] || {};
+  if (delaCarrera[lunes0] == null) {
+    delaCarrera[lunes0] = elegido.semanas[0].objetivo;
+    hist = { [fechaCarreraStr]: delaCarrera }; // solo se guarda la carrera vigente
+    try { localStorage.setItem(LS_PLAN_CARGA_HIST, JSON.stringify(hist)); } catch (e) { /* sin persistencia */ }
+  }
+  const pasadas = Object.keys(delaCarrera).filter(l => l < lunes0).sort().map(l => ({
+    lunes: l, objetivo: delaCarrera[l], hecho: Math.round(_sumaRango(porDia, l, 7))
+  }));
+  const actual = elegido.semanas[0];
+  actual.objetivoCongelado = delaCarrera[lunes0];
+
+  return { disponible: true, ...elegido, alcanza, rango, cuotaRun, ctl0, pasadas, hoyStr };
+}
+
+// TSS que queda en la semana actual según el plan (para "Qué hacer hoy")
+function restanteSemanaPlan(plan) {
+  if (!plan || !plan.disponible) return null;
+  const s = plan.semanas[0];
+  const domingo = _sumarDias(s.lunes, s.dias - 1);
+  const diasQuedan = Math.round((new Date(domingo + 'T00:00:00') - new Date(plan.hoyStr + 'T00:00:00')) / 86400000) + 1;
+  const queda = Math.round(s.objetivo - s.hechoAntesHoy);
+  return { queda, diasQuedan, porDia: diasQuedan > 0 ? Math.max(0, Math.round(queda / diasQuedan)) : 0, objetivo: s.objetivo, hecho: s.hechoAntesHoy, tipo: s.tipo };
+}
+
+function planCargaActual(sesiones = loadSesionesMeta()) {
+  const fecha = localStorage.getItem(LS_CARRERA_FECHA) || '';
+  if (!fecha) return null;
+  return calcularPlanCarga(sesiones, fecha, rangoTsbObjetivo(sesiones));
+}
+
+function _fechaCortaPlan(f) { const [y, m, d] = f.split('-').map(Number); return `${d} ${MESES_CORTOS_RIO[m - 1]}`; }
+
+function renderPlanCarga() {
+  const el = document.getElementById('planCargaWidget');
+  if (!el) return;
+  const plan = planCargaActual();
+  if (!plan) { el.innerHTML = ''; return; }
+  if (!plan.disponible) { el.innerHTML = plan.motivo ? `<p class="hint" style="margin-top:10px;">📅 ${plan.motivo}</p>` : ''; return; }
+
+  const TIPOS = { carga: '🔺 Carga', descarga: '🔻 Descarga', taper: '🪶 Taper', carrera: '🏁 Carrera' };
+  const filaPasada = s => {
+    const pct = s.objetivo > 0 ? Math.round(s.hecho / s.objetivo * 100) : null;
+    const clase = pct == null ? '' : pct >= 85 && pct <= 115 ? 'up' : pct > 115 ? 'warn' : 'down';
+    return `<div class="plan-fila pasada"><span class="sem">${_fechaCortaPlan(s.lunes)}</span><span class="tipo">hecha</span><span class="tss">${s.hecho} / ${s.objetivo}</span><span class="extra ${clase}">${pct != null ? pct + ' %' : '—'}</span></div>`;
+  };
+  const filas = plan.semanas.map(s => {
+    const min = Math.round(s.objetivo * (1 - PLAN_MARGEN)), max = Math.round(s.objetivo * (1 + PLAN_MARGEN));
+    const parcial = s.dias < 7 ? ` <span class="hint">(${s.dias} d)</span>` : '';
+    let progreso = '';
+    if (s.esActual) {
+      const pct = s.objetivo > 0 ? Math.min(100, Math.round(s.hecho / s.objetivo * 100)) : 0;
+      progreso = `<div class="plan-progreso"><div style="width:${pct}%"></div></div><div class="hint plan-progreso-txt">Llevas ${s.hecho} de ${s.objetivo} TSS esta semana${plan.cuotaRun > 0.05 ? ` · 🏃 mínimo ${s.runMin} de running` : ''}</div>`;
+    }
+    return `<div class="plan-fila ${s.tipo}${s.esActual ? ' actual' : ''}">
+      <span class="sem">${s.esActual ? 'Esta sem.' : _fechaCortaPlan(s.lunes)}</span>
+      <span class="tipo">${TIPOS[s.tipo]}</span>
+      <span class="tss">${min}–${max}${parcial}${s.limitadoAcwr ? ' <span title="Recortado para no pasar de ACWR ' + PLAN_ACWR_MAX + '">⚠︎</span>' : ''}</span>
+      <span class="extra">CTL ${Math.round(s.ctlFin)} · TSB ${fmtTsb(Math.round(s.tsbFin))}</span>
+      ${progreso}
+    </div>`;
+  }).join('');
+
+  const rangoTxt = `${fmtTsb(plan.rango.min)} a ${fmtTsb(plan.rango.max)}`;
+  const resumen = plan.alcanza
+    ? `Taper de ${plan.taperDias} días desde el ${_fechaCortaPlan(plan.inicioTaper)}: llegas con CTL ${Math.round(plan.ctlCarrera)} y TSB ${fmtTsb(Math.round(plan.tsbCarrera))} (${plan.rango.personal ? 'tu rango' : 'rango de referencia'} ${rangoTxt}).`
+    : `Ni con ${plan.taperDias} días de taper llegas a ${rangoTxt}: TSB previsto ${fmtTsb(Math.round(plan.tsbCarrera))}. Tu fatiga de partida es alta; prioriza descansar bien.`;
+
+  el.innerHTML = `
+    <details class="tool-details plan-carga" ${(() => { try { return localStorage.getItem('wattly_plan_abierto') === '1' ? 'open' : ''; } catch (e) { return ''; } })()}>
+      <summary>📅 Plan semana a semana</summary>
+      <p class="hint pmc-status ${plan.alcanza ? 'up' : 'warn'}" style="margin:2px 0 8px;">${resumen}</p>
+      ${plan.pasadas.length ? `<div class="plan-tabla">${plan.pasadas.map(filaPasada).join('')}</div>` : ''}
+      <div class="plan-tabla">${filas}</div>
+      <p class="hint" style="margin-top:8px; opacity:.75">TSS por semana (lunes a domingo) para que el CTL suba ~${PLAN_RAMPA_CTL_SEMANA} por semana sin pasar de un ACWR de ${String(PLAN_ACWR_MAX).replace('.', ',')}; 1 semana de descarga (${Math.round(PLAN_DESCARGA_PCT * 100)} %) cada ${PLAN_CICLO_SEMANAS}, y taper al ${Math.round(PLAN_TAPER_PCT * 100)} %. Se recalcula cada día con lo que realmente haces; ⚠︎ = recortado por ACWR. El mínimo de running sigue tu reparto de las últimas ${PLAN_RUN_VENTANA_DIAS / 7} semanas (${Math.round(plan.cuotaRun * 100)} %), para no llegar a la carrera sin piernas de correr. Modelo simplificado: orienta, no sustituye a cómo te encuentres.</p>
+    </details>`;
+  const det = el.querySelector('details');
+  det.addEventListener('toggle', () => { try { localStorage.setItem('wattly_plan_abierto', det.open ? '1' : '0'); } catch (e) { /* nada */ } });
+}
+
+// ============================================================
+// CONSTRUIR FORMA (sin carrera) — el mismo motor de semanas que el plan de
+// carrera, pero sin taper: un plan móvil de 4 semanas (3 de carga + 1 de
+// descarga, ancladas al calendario para que no se muevan al recalcular) y,
+// para cada semana, el TSB MEDIO al que apuntar. Media de la semana, no el
+// TSB de cada día: un día suelto muy negativo tras una sesión dura es normal.
+//  · Carga: zona de entrenamiento productivo de referencia (Coggan, −10/−30)
+//    o tu zona personal si es fiable.
+//  · Descarga: −5/+5, para absorber lo hecho.
+// Zona personal: con qué TSB medio semanal te subió el CTL ESA semana (el
+// coste de entrenar) sin dolor de rodilla relevante ni esa semana ni las 2
+// siguientes (el dolor llega con retraso). No se mira el CTL de las semanas
+// siguientes: depende de lo que hagas después, no del TSB de esta.
+// ============================================================
+const CONSTR_SEMANAS = 4;
+const CONSTR_ANCLA_LUNES = '2026-01-05';      // fija la fase del ciclo 3:1 en el calendario
+const CONSTR_TSB_CARGA = { min: -30, max: -10 };
+const CONSTR_TSB_DESCARGA = { min: -5, max: 5 };
+const ZPROD_SEMANAS_DESPUES = 2;               // semanas siguientes en las que se vigila el dolor
+const ZPROD_DCTL_MIN = 1;                     // subida de CTL en la semana para contar como productiva
+const ZPROD_DOLOR_MAX = 2;                    // dolor medio (0-10) que se considera "sin dolor relevante"
+const ZPROD_MIN_SEMANAS = 12;
+const ZPROD_MIN_POR_TRAMO = 3;
+const ZPROD_MIN_TASA = 0.6;                   // ≥60 % de semanas productivas en el tramo
+const ZPROD_TRAMOS = [
+  { min: -40, max: -30, lbl: '−40 a −30' },
+  { min: -30, max: -20, lbl: '−30 a −20' },
+  { min: -20, max: -10, lbl: '−20 a −10' },
+  { min: -10, max: 0,   lbl: '−10 a 0' },
+  { min: 0,   max: 10,  lbl: '0 a +10' }
+];
+
+function _tipoSemanaConstruccion(lunes) {
+  const idx = Math.round((new Date(lunes + 'T00:00:00') - new Date(CONSTR_ANCLA_LUNES + 'T00:00:00')) / (7 * 86400000));
+  return ((idx % PLAN_CICLO_SEMANAS) + PLAN_CICLO_SEMANAS) % PLAN_CICLO_SEMANAS === PLAN_CICLO_SEMANAS - 1 ? 'descarga' : 'carga';
+}
+
+function calcularZonaProductiva(sesiones, ahora = new Date()) {
+  const pmc = calcularPMC(sesiones, ahora);
+  if (!pmc.serie.length) return { disponible: false, n: 0, motivo: 'Sin sesiones todavía.' };
+  const porFecha = {}; pmc.serie.forEach(d => { porFecha[d.fecha] = d; });
+  const dolorPorFecha = {};
+  sesiones.forEach(s => { const v = s.rodilla?.dolor_0_10; if (v != null) (dolorPorFecha[s.fecha] = dolorPorFecha[s.fecha] || []).push(v); });
+  const lunesHoy = fechaLocalStr(inicioPeriodo('semana', ahora));
+  let l = fechaLocalStr(inicioPeriodo('semana', new Date(pmc.serie[0].fecha + 'T00:00:00')));
+  l = _sumarDias(l, 7 * 4); // las 4 primeras semanas del historial tienen un CTL aún sin asentar
+  const semanas = [];
+  for (; _sumarDias(l, 7 * (ZPROD_SEMANAS_DESPUES + 1)) <= lunesHoy; l = _sumarDias(l, 7)) { // la semana y su seguimiento deben haber terminado
+    const tsbs = []; for (let i = 0; i < 7; i++) { const d = porFecha[_sumarDias(l, i)]; if (d) tsbs.push(d.tsb); }
+    const finAnterior = porFecha[_sumarDias(l, -1)], finSem = porFecha[_sumarDias(l, 6)];
+    if (tsbs.length < 7 || !finSem || !finAnterior) continue;
+    const dolores = []; for (let i = 0; i < 7 * (ZPROD_SEMANAS_DESPUES + 1); i++) (dolorPorFecha[_sumarDias(l, i)] || []).forEach(v => dolores.push(v));
+    const dCtl = finSem.ctl - finAnterior.ctl;
+    const dolor = dolores.length ? mediaDe(dolores) : 0;
+    semanas.push({ lunes: l, tsb: mediaDe(tsbs), dCtl, dolor, productiva: dCtl >= ZPROD_DCTL_MIN && dolor <= ZPROD_DOLOR_MAX });
+  }
+  if (semanas.length < ZPROD_MIN_SEMANAS) {
+    return { disponible: false, n: semanas.length, motivo: `Hay ${semanas.length} semanas completas con ${ZPROD_SEMANAS_DESPUES} de seguimiento detrás; hacen falta ${ZPROD_MIN_SEMANAS} para ver con qué TSB progresas sin dolor.` };
+  }
+  const tramos = ZPROD_TRAMOS.map(t => {
+    const ss = semanas.filter(s => s.tsb >= t.min && s.tsb < t.max);
+    return { ...t, n: ss.length, tasa: ss.length ? ss.filter(s => s.productiva).length / ss.length : null, dCtl: ss.length ? mediaDe(ss.map(s => s.dCtl)) : null };
+  });
+  const validos = tramos.filter(t => t.n >= ZPROD_MIN_POR_TRAMO);
+  if (validos.length < 2) return { disponible: false, n: semanas.length, tramos, motivo: 'Casi todas tus semanas caen en el mismo tramo de TSB: hace falta variedad para comparar.' };
+  const buenos = validos.filter(t => t.tasa >= ZPROD_MIN_TASA && t.dCtl >= ZPROD_DCTL_MIN);
+  if (!buenos.length) return { disponible: true, fiable: false, n: semanas.length, tramos, motivoNoFiable: `Ningún tramo llega a un ${Math.round(ZPROD_MIN_TASA * 100)} % de semanas que suban el CTL sin dolor relevante.` };
+  // zona = el mejor tramo (más CTL ganado) y los tramos buenos contiguos a él
+  const mejor = buenos.slice().sort((a, b) => b.dCtl - a.dCtl)[0];
+  let iMin = tramos.indexOf(mejor), iMax = iMin;
+  while (iMin > 0 && buenos.includes(tramos[iMin - 1])) iMin--;
+  while (iMax < tramos.length - 1 && buenos.includes(tramos[iMax + 1])) iMax++;
+  // Barandilla: tu zona puede estrechar la de referencia, nunca ir más allá
+  // de ella (más cargado que −30 o "construir" con TSB positivo).
+  const min = Math.max(tramos[iMin].min, CONSTR_TSB_CARGA.min), max = Math.min(tramos[iMax].max, 0);
+  if (min >= max) return { disponible: true, fiable: false, n: semanas.length, tramos, motivoNoFiable: `Tus semanas productivas caen fuera del rango razonable (${fmtTsb(CONSTR_TSB_CARGA.min)} a 0), así que se mantiene el de referencia.` };
+  return { disponible: true, fiable: true, n: semanas.length, tramos, min, max, mejor, recortada: min !== tramos[iMin].min || max !== tramos[iMax].max };
+}
+
+function rangoTsbConstruccion(sesiones) {
+  const z = calcularZonaProductiva(sesiones);
+  if (z.disponible && z.fiable) return { carga: { min: z.min, max: z.max }, personal: true, zona: z };
+  return { carga: CONSTR_TSB_CARGA, personal: false, zona: z };
+}
+
+function calcularPlanConstruccion(sesiones, ahora = new Date()) {
+  const hoyStr = fechaLocalStr(ahora);
+  const { porDia, primeraFecha } = construirSerieTssDiario(sesiones);
+  if (!primeraFecha) return { disponible: false, motivo: 'Sin sesiones todavía.' };
+  const diasHistorial = Math.round((new Date(hoyStr + 'T00:00:00') - new Date(primeraFecha + 'T00:00:00')) / 86400000);
+  if (diasHistorial < PLAN_MIN_DIAS_HISTORIAL) return { disponible: false, motivo: `Hacen falta al menos ${PLAN_MIN_DIAS_HISTORIAL} días de historial para planificar sin pasarse de carga (tienes ${diasHistorial}).` };
+
+  const porDiaRun = _tssRunPorDia(sesiones);
+  const lunes0 = fechaLocalStr(inicioPeriodo('semana', new Date(hoyStr + 'T00:00:00')));
+  const pmcIni = calcularPMC(sesiones, new Date(_sumarDias(lunes0, -1) + 'T00:00:00'));
+  let ctl = pmcIni.actual.ctl || 0, atl = pmcIni.actual.atl || 0;
+  const pmcHoy = calcularPMC(sesiones, ahora);
+  const tsbPorFecha = {}; pmcHoy.serie.forEach(d => { tsbPorFecha[d.fecha] = d.tsb; });
+
+  const totRec = _sumaRango(porDia, _sumarDias(hoyStr, -PLAN_RUN_VENTANA_DIAS), PLAN_RUN_VENTANA_DIAS);
+  const cuotaRun = totRec > 0 ? _sumaRango(porDiaRun, _sumarDias(hoyStr, -PLAN_RUN_VENTANA_DIAS), PLAN_RUN_VENTANA_DIAS) / totRec : 0;
+  const rangos = rangoTsbConstruccion(sesiones);
+  const a = Math.pow(1 - 1 / CTL_DIAS, 7);
+  const totales = {}, totalesRun = {};
+  for (let j = 1; j <= 3; j++) { const l = _sumarDias(lunes0, -7 * j); totales[l] = _sumaRango(porDia, l, 7); totalesRun[l] = _sumaRango(porDiaRun, l, 7); }
+  let ultimaCarga = null;
+
+  const semanas = [];
+  for (let k = 0; k < CONSTR_SEMANAS; k++) {
+    const lunes = _sumarDias(lunes0, 7 * k);
+    const tipo = _tipoSemanaConstruccion(lunes);
+    const s3 = [1, 2, 3].reduce((t, j) => t + (totales[_sumarDias(lunes, -7 * j)] || 0), 0);
+    const s3run = [1, 2, 3].reduce((t, j) => t + (totalesRun[_sumarDias(lunes, -7 * j)] || 0), 0);
+    let objetivo7 = Math.max(0, ctl + PLAN_RAMPA_CTL_SEMANA / (1 - a)) * 7;
+    if (tipo === 'descarga') objetivo7 = (ultimaCarga ?? s3 / 3) * PLAN_DESCARGA_PCT; // sin carga planificada antes: 60 % de lo que venías haciendo
+    let limitadoAcwr = false;
+    const tope = _topeAcwr(s3);
+    if (objetivo7 > tope) { objetivo7 = tope; limitadoAcwr = true; }
+    if (tipo === 'carga') ultimaCarga = objetivo7;
+    const objetivo = Math.round(objetivo7);
+
+    // días: semana actual = reales hasta ayer + lo que falta repartido
+    const dias = []; for (let i = 0; i < 7; i++) dias.push(_sumarDias(lunes, i));
+    let cargas = dias.map(() => objetivo7 / 7), hechoAntes = 0;
+    if (k === 0) {
+      hechoAntes = dias.filter(f => f < hoyStr).reduce((t, f) => t + (porDia[f] || 0), 0);
+      const quedan = dias.filter(f => f >= hoyStr).length;
+      const queda = Math.max(0, objetivo - hechoAntes);
+      cargas = dias.map(f => f < hoyStr ? (porDia[f] || 0) : queda / quedan);
+    }
+    const tsbsSim = [];
+    cargas.forEach(L => { ctl = ctl + (L - ctl) / CTL_DIAS; atl = atl + (L - atl) / ATL_DIAS; tsbsSim.push(ctl - atl); });
+    totales[lunes] = cargas.reduce((t, v) => t + v, 0);
+    const runMin = Math.round(Math.min(cuotaRun * objetivo, _topeAcwr(s3run)));
+    totalesRun[lunes] = runMin;
+    // TSB medio: real en lo que va de semana, previsto para el resto
+    const tsbReal = k === 0 ? dias.filter(f => f <= hoyStr && tsbPorFecha[f] != null).map(f => tsbPorFecha[f]) : [];
+    semanas.push({
+      lunes, dias: 7, tipo, objetivo, runMin, limitadoAcwr, esActual: k === 0,
+      hechoAntesHoy: k === 0 ? Math.round(hechoAntes) : null,
+      hecho: k === 0 ? Math.round(_sumaRango(porDia, lunes, 7)) : null,
+      ctlFin: Number(ctl.toFixed(1)),
+      tsbMedioPrevisto: Number(mediaDe(tsbsSim).toFixed(1)),
+      tsbMedioReal: tsbReal.length ? Number(mediaDe(tsbReal).toFixed(1)) : null,
+      rangoTsb: tipo === 'carga' ? rangos.carga : CONSTR_TSB_DESCARGA
+    });
+  }
+  return { disponible: true, modo: 'construccion', semanas, hoyStr, cuotaRun, rangos, ctl0: pmcIni.actual.ctl || 0 };
+}
+
+// Plan que manda hoy: el de la carrera si hay una por delante; si no, construir forma
+function planActivo(sesiones = loadSesionesMeta()) {
+  const fecha = localStorage.getItem(LS_CARRERA_FECHA) || '';
+  if (fecha && fecha >= fechaLocalStr(new Date())) {
+    const p = calcularPlanCarga(sesiones, fecha, rangoTsbObjetivo(sesiones));
+    return p.disponible ? { ...p, modo: 'carrera' } : null;
+  }
+  return calcularPlanConstruccion(sesiones);
+}
+
+function renderConstruirFormaWidget() {
+  const el = document.getElementById('construirFormaWidget');
+  if (!el) return;
+  const fecha = localStorage.getItem(LS_CARRERA_FECHA) || '';
+  if (fecha && fecha >= fechaLocalStr(new Date())) { el.innerHTML = ''; return; } // con carrera manda su plan
+  const sesiones = loadSesionesMeta();
+  if (!sesiones.length) { el.innerHTML = ''; return; }
+  const titulo = `<h3>📈 Construir forma <span class="beta-tag">beta</span></h3>`;
+  const plan = calcularPlanConstruccion(sesiones);
+  if (!plan.disponible) { el.innerHTML = `<div class="card">${titulo}${estadoVacioHtml(plan.motivo)}</div>`; return; }
+
+  const TIPOS = { carga: '🔺 Carga', descarga: '🔻 Descarga' };
+  const enRango = (v, r) => v >= r.min && v <= r.max;
+  const act = plan.semanas[0];
+  const rTxt = r => `${fmtTsb(r.min)} a ${fmtTsb(r.max)}`;
+  const tsbVer = act.tsbMedioReal ?? act.tsbMedioPrevisto;
+  const estadoTsb = enRango(tsbVer, act.rangoTsb) ? 'up' : 'warn';
+  const leyendaTsb = tsbVer > act.rangoTsb.max
+    ? (act.tipo === 'carga' ? 'vas más fresco de lo que pide una semana de carga: hay margen para meter más' : 'algo fresco: bien para descargar')
+    : tsbVer < act.rangoTsb.min ? 'vas más cargado de lo previsto: no sumes más intensidad esta semana' : 'en zona';
+  const pct = act.objetivo > 0 ? Math.min(100, Math.round(act.hecho / act.objetivo * 100)) : 0;
+  const filas = plan.semanas.slice(1).map(s => {
+    const min = Math.round(s.objetivo * (1 - PLAN_MARGEN)), max = Math.round(s.objetivo * (1 + PLAN_MARGEN));
+    return `<div class="plan-fila ${s.tipo}">
+      <span class="sem">${_fechaCortaPlan(s.lunes)}</span>
+      <span class="tipo">${TIPOS[s.tipo]}</span>
+      <span class="tss">${min}–${max}${s.limitadoAcwr ? ' <span title="Recortado para no pasar de ACWR ' + PLAN_ACWR_MAX + '">⚠︎</span>' : ''}</span>
+      <span class="extra">TSB medio ${rTxt(s.rangoTsb)} · CTL → ${Math.round(s.ctlFin)}</span>
+    </div>`;
+  }).join('');
+
+  const z = plan.rangos.zona;
+  let zonaHtml;
+  if (plan.rangos.personal) {
+    zonaHtml = `🎯 Tu zona productiva: TSB medio <b>${rTxt(plan.rangos.carga)}</b> en semanas de carga, sacada de ${z.n} semanas tuyas (ahí te subió el CTL sin dolor relevante después).${z.recortada ? ` Recortada a ${fmtTsb(CONSTR_TSB_CARGA.min)} como máximo de carga: más allá no se planifica aunque te haya ido bien.` : ''}`;
+  } else {
+    zonaHtml = `🎯 Zona de referencia en carga: ${rTxt(CONSTR_TSB_CARGA)}, no la tuya todavía. ${z.motivo || z.motivoNoFiable || ''}`;
+  }
+  const tramosHtml = z.tramos ? z.tramos.filter(t => t.n).map(t => {
+    const valido = t.n >= ZPROD_MIN_POR_TRAMO;
+    const ok = valido && t.tasa >= ZPROD_MIN_TASA && t.dCtl > 0;
+    return `<div class="tsbopt-fila${ok ? ' mejor' : ''}${valido ? '' : ' poco'}"><span class="lbl">${t.lbl}</span>
+      <div class="tsbopt-barra" style="background:var(--surface);"><div style="position:absolute; left:0; top:0; bottom:0; width:${Math.round((t.tasa || 0) * 100)}%; background:${ok ? 'var(--teal)' : 'var(--amber)'}; border-radius:7px;"></div></div>
+      <span class="val">${Math.round((t.tasa || 0) * 100)} % <span style="opacity:.6">(${t.n})</span></span></div>`;
+  }).join('') : '';
+
+  el.innerHTML = `<div class="card">${titulo}
+    <p class="hint">Sin carrera a la vista: sube el CTL poco a poco (~${PLAN_RAMPA_CTL_SEMANA} por semana), 3 semanas de carga y 1 de descarga, sin pasar de un ACWR de ${String(PLAN_ACWR_MAX).replace('.', ',')}. El TSB que cuenta es la <b>media de la semana</b>, no el de cada día.</p>
+    <div class="plan-tabla" style="margin-top:8px;">
+      <div class="plan-fila ${act.tipo} actual">
+        <span class="sem">Esta sem.</span><span class="tipo">${TIPOS[act.tipo]}</span>
+        <span class="tss">${Math.round(act.objetivo * (1 - PLAN_MARGEN))}–${Math.round(act.objetivo * (1 + PLAN_MARGEN))}</span>
+        <div class="plan-progreso"><div style="width:${pct}%"></div></div>
+        <div class="hint plan-progreso-txt">Llevas ${act.hecho} de ${act.objetivo} TSS${plan.cuotaRun > 0.05 ? ` · 🏃 mínimo ${act.runMin} de running` : ''}</div>
+        <div class="plan-progreso-txt constr-tsb ${estadoTsb}">TSB medio ${act.tsbMedioReal != null ? '' : 'previsto '}${fmtTsb(Math.round(tsbVer))} · objetivo ${rTxt(act.rangoTsb)} — ${leyendaTsb}</div>
+      </div>
+      ${filas}
+    </div>
+    <p class="hint" style="margin-top:10px;">${zonaHtml}</p>
+    ${tramosHtml ? `<details class="tool-details" style="margin:4px 0 0;"><summary>Cómo se calcula tu zona</summary>
+      <p class="hint">Para cada semana de tu historial: su TSB medio y si esa semana te subió el CTL (+${ZPROD_DCTL_MIN} o más) con un dolor de rodilla medio de ${ZPROD_DOLOR_MAX}/10 o menos esa semana y las ${ZPROD_SEMANAS_DESPUES} siguientes. La barra es el % de semanas así por tramo; entre paréntesis, cuántas. Cuentan los tramos con ${ZPROD_MIN_POR_TRAMO}+ semanas y un ${Math.round(ZPROD_MIN_TASA * 100)} % o más.</p>
+      ${tramosHtml}</details>` : ''}
+    <p class="hint" style="margin-top:6px; opacity:.75">Al poner una carrera objetivo, esta tarjeta deja paso al plan hasta la carrera. Modelo simplificado: orienta, no sustituye a cómo te encuentres.</p>
+  </div>`;
+}
+
+function lineaTsbOptimoHtml(rango) {
+  if (rango.personal) return `<p class="hint" style="margin-top:6px;">🎯 Tu TSB óptimo: <b>${fmtTsb(rango.min)} a ${fmtTsb(rango.max)}</b>, sacado de ${rango.n} carreras y tests tuyos. El taper apunta ahí.</p>`;
+  const faltan = Math.max(0, TSBOPT_MIN_ESFUERZOS - (rango.n || 0));
+  return `<p class="hint" style="margin-top:6px;">🎯 Objetivo de referencia (+${TSB_OBJETIVO_MIN} a +${TSB_OBJETIVO_MAX}), no el tuyo todavía${faltan ? `: faltan ${faltan} carreras o tests comparables para calcularlo` : ''}. Detalle en Stats → Récords y capacidad.</p>`;
 }
 
 // ---------- Simulador de sesión ----------
@@ -14367,6 +15268,49 @@ function renderComparadorWidget() {
 }
 
 
+// ---------- Aviso de copia de seguridad ----------
+// Todo vive en este móvil: si se borran los datos del navegador, se pierde.
+// Se recuerda cuándo fue el último backup exportado y se avisa en Hoy si
+// pasa de BACKUP_AVISO_DIAS. La clave NO empieza por "em_" a propósito: así
+// no entra en el propio backup ni la pisa al restaurar uno antiguo.
+const LS_ULTIMO_BACKUP = 'wattly_ultimo_backup';
+const BACKUP_AVISO_DIAS = 30;
+const BACKUP_AVISO_MIN_SESIONES = 5; // con la app recién estrenada no hay nada que perder
+
+function marcarBackupHecho() {
+  try { localStorage.setItem(LS_ULTIMO_BACKUP, new Date().toISOString()); } catch (e) { /* sin persistencia */ }
+  renderAvisoBackup();
+}
+function diasDesdeUltimoBackup() {
+  let iso = null;
+  try { iso = localStorage.getItem(LS_ULTIMO_BACKUP); } catch (e) { iso = null; }
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? Math.floor((Date.now() - t) / 86400000) : null;
+}
+function textoDiasBackup(d) {
+  return d === 0 ? 'hoy' : d === 1 ? 'ayer' : `hace ${d} días`;
+}
+function renderAvisoBackup() {
+  const dias = diasDesdeUltimoBackup();
+  const estadoEl = document.getElementById('ultimoBackupEstado');
+  if (estadoEl) {
+    estadoEl.textContent = dias == null ? 'Todavía no has exportado ningún backup desde este móvil.' : `Último backup: ${textoDiasBackup(dias)}.`;
+    estadoEl.style.color = (dias == null || dias > BACKUP_AVISO_DIAS) ? 'var(--amber)' : '';
+  }
+  const el = document.getElementById('avisoBackupWidget');
+  if (!el) return;
+  const nSesiones = loadSesionesMeta().length;
+  const avisar = nSesiones >= BACKUP_AVISO_MIN_SESIONES && (dias == null || dias > BACKUP_AVISO_DIAS);
+  if (!avisar) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="aviso-backup">
+      <span>💾 ${dias == null ? 'Nunca has hecho backup' : `Último backup ${textoDiasBackup(dias)}`} — tus ${nSesiones} sesiones solo están en este móvil.</span>
+      <button class="link-btn" id="avisoBackupBtn" type="button">Hacer backup</button>
+    </div>`;
+  document.getElementById('avisoBackupBtn').addEventListener('click', () => document.getElementById('exportBtn').click());
+}
+
 document.getElementById('exportBtn').addEventListener('click', async () => {
   const statusEl = document.getElementById('backupStatus');
   statusEl.textContent = 'Preparando backup...';
@@ -14384,6 +15328,7 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 5000);
     const mb = (blob.size / 1048576).toFixed(1);
+    marcarBackupHecho();
     statusEl.textContent = `Backup v4 descargado (${mb} MB): ${_textoResumenBackup(backup.resumen)}. Comprueba que aparece en Descargas. La API key no se incluye.`;
     statusEl.className = 'status ok';
   } catch (err) {
@@ -14759,6 +15704,8 @@ function abrirRegistroModal(sessionId) {
   // El desgaste de zapatillas solo aplica a running: para bici/gym el chip
   // no aporta nada y solo ensuciaría el modal.
   const esRunning = categoriaDisciplina(s.tipo) === 'running';
+  document.getElementById('carreraTestFieldWrap').style.display = esRunning ? 'block' : 'none';
+  seleccionarChip('es_carrera', esRunning ? (esCarreraOTest(s) ? 'si' : 'no') : '');
   const wrapZapatilla = document.getElementById('zapatillaFieldWrap');
   wrapZapatilla.style.display = esRunning ? 'block' : 'none';
   if (esRunning) {
@@ -14790,7 +15737,9 @@ document.getElementById('guardarRegistroBtn').addEventListener('click', () => {
   const fase = document.getElementById('faseInput').value.trim() || null;
   if (fase) localStorage.setItem(LS_FASE_ACTUAL, fase);
 
+  const marcaCarrera = valorChipSeleccionado('es_carrera');
   actualizarSesion(sessionIdEnEdicion, {
+    ...(marcaCarrera ? { es_carrera: marcaCarrera === 'si' } : {}),
     registro_manual: {
       zona_trabajada: valorChipSeleccionado('zona'),
       rpe: Number(document.getElementById('rpeRange').value),
@@ -14812,6 +15761,7 @@ document.getElementById('guardarRegistroBtn').addEventListener('click', () => {
   renderSesiones();
   renderEstadisticas();
   renderZapatillas();
+  if (marcaCarrera) renderForma(); // el TSB óptimo puede mover el objetivo del taper
 });
 document.getElementById('cerrarRegistroBtn').addEventListener('click', () => {
   document.getElementById('registroModal').style.display = 'none';
