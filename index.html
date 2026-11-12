@@ -615,6 +615,34 @@
   .empty-state .ic{ width:16px; height:16px; margin:1px 0 0; flex-shrink:0; opacity:.65; }
   .empty-state p.hint{ margin:0; }
 
+  /* ---- Entrega 1: zonas, gráfico de sesión y gráficos táctiles ---- */
+  svg[data-scrub]{ touch-action:pan-y; -webkit-user-select:none; user-select:none; cursor:crosshair; }
+  .scrub-capa{ position:absolute; inset:0; pointer-events:none; z-index:3; }
+  .scrub-linea{ position:absolute; width:1px; background:var(--text); opacity:.55; transform:translateX(-.5px); }
+  .scrub-punto{ position:absolute; width:8px; height:8px; margin:-4px 0 0 -4px; border-radius:50%; background:var(--text); box-shadow:0 0 0 2px var(--bg); }
+  .scrub-etiqueta{ position:absolute; background:rgba(20,23,31,.94); border:1px solid var(--line); border-radius:8px; padding:5px 8px;
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; line-height:1.45; color:var(--text-dim); white-space:nowrap; box-shadow:0 4px 12px rgba(0,0,0,.35); }
+  .scrub-etiqueta b{ color:var(--text); font-weight:500; }
+  .sg-wrap{ margin:2px 0 12px; }
+  .sg-wrap:empty{ display:none; }
+  .sg-svg{ width:100%; height:auto; display:block; margin-top:6px; }
+  .sg-cabecera{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .sg-toggle{ display:flex; background:var(--surface-2); border-radius:7px; padding:2px; }
+  .sg-toggle button{ background:transparent; border:none; color:var(--text-dim); font-family:'JetBrains Mono',monospace; font-size:10.5px; padding:4px 8px; border-radius:5px; cursor:pointer; }
+  .sg-toggle button.active{ background:var(--surface); color:var(--text); }
+  .mini-mapa-cursor{ fill:var(--text); stroke:var(--bg); stroke-width:2; }
+  .zonas-barra-card{ margin:2px 0 12px; }
+  .zonas-barra{ display:flex; height:12px; border-radius:6px; overflow:hidden; margin-top:6px; background:var(--surface-2); }
+  .zonas-barra span{ display:block; height:100%; }
+  .zonas-barra-leyenda{ display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:6px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim); }
+  .zonas-barra-leyenda b{ color:var(--text); font-weight:500; }
+  .zb-item{ display:inline-flex; align-items:center; gap:4px; }
+  .polar-resumen{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
+  .polar-resumen > div{ background:var(--surface-2); border-radius:10px; padding:10px; display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
+  .polar-num{ font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600; letter-spacing:-.02em; }
+  .umbral-fila{ margin-top:10px; }
+  .umbral-fila .hint{ margin:2px 0 6px; }
+  .umbral-input{ width:100%; padding:10px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:13px; }
 </style>
 </head>
 <body>
@@ -676,6 +704,7 @@
       <div class="section-divider"><span class="dot"></span> Cómo voy</div>
       <div id="rioTemporadaWidget"></div>
       <div id="vistaUnificadaWidget"></div>
+      <div id="polarizacionWidget"></div>
       <div id="statsWidget"></div>
 
       <details class="stats-seccion" data-seccion="cambios">
@@ -845,6 +874,12 @@
         </div>
         <div id="ftpConfiguradoStatus" class="status"></div>
         <div id="ftpChequeoWidget"></div>
+      </div>
+
+      <div class="card">
+        <h3>❤️ Umbral de FC (zonas)</h3>
+        <p class="hint">Las zonas de FC salen de tu umbral: por defecto, tu mejor FC media de 20 min seguidos en los últimos 90 días, por separado en carrera y bici. Si en ese tiempo no has hecho ningún esfuerzo duro y largo, sale bajo: fíjalo a mano con el de tu último test.</p>
+        <div id="umbralFcAjustes"></div>
       </div>
 
       <div class="card">
@@ -6912,11 +6947,15 @@ function generarMiniMapaSvg(puntos, opts = {}) {
     trazado = `<polyline points="${puntosSvg}" fill="none" stroke="var(--teal)" stroke-width="${Math.max(2, grosor - 1)}" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
   }
 
+  // Proyección guardada en el propio SVG para poder situar después un
+  // cursor (gráfico de la sesión) sin recalcularla.
+  const proy = JSON.stringify({ m: MARGEN, h: ALTO, c: Number(cosLat.toFixed(8)), x0: minX, y0: minY, e: escala });
   return `
-    <svg viewBox="0 0 ${ANCHO} ${ALTO}" class="mini-mapa-svg">
+    <svg viewBox="0 0 ${ANCHO} ${ALTO}" class="mini-mapa-svg" data-proy='${proy}'>
       ${trazado}
       <circle cx="${inicio.x.toFixed(1)}" cy="${inicio.y.toFixed(1)}" r="3.5" class="mini-mapa-inicio"/>
       <circle cx="${fin.x.toFixed(1)}" cy="${fin.y.toFixed(1)}" r="3.5" class="mini-mapa-fin"/>
+      <circle cx="0" cy="0" r="4.5" class="mini-mapa-cursor" style="display:none"/>
     </svg>
   `;
 }
@@ -10018,6 +10057,8 @@ async function procesarFitFile(arrayBuffer, nombreFichero) {
   // Mejores 20 y 12 min de potencia, guardados ya al importar: así el aviso
   // de FTP no tiene que releer todos los tracks cada vez.
   if (categoriaDisciplina(sesionMeta.tipo) === 'cycling' && track.length) sesionMeta.potencia_picos = picosPotenciaDeTrack(track);
+  // Histograma de FC/potencia para las zonas (ver bloque de zonas)
+  if (track.length) sesionMeta.zonas = histogramaDeTrack(track);
   if (sesionMeta.es_interior && categoriaDisciplina(sesionMeta.tipo) === 'cycling') {
     const pf = detectarPruebaFija(track);
     if (pf) sesionMeta.prueba_fija = pf;
@@ -10328,6 +10369,706 @@ async function llamarClaude(apiKey, userMsg) {
     throw new Error(`La API respondió sin contenido de texto${motivo}. Puede ser un corte de seguridad puntual — prueba a regenerar, y si se repite con el mismo motivo, dímelo.`);
   }
   return texto;
+}
+</script>
+  <script>// ============================================================
+// ZONAS, GRÁFICO DE SESIÓN Y GRÁFICOS TÁCTILES
+// Bloque propio (antes del de interfaz) para que todo lo nuevo de la
+// entrega 1 esté junto. Solo usa funciones de los bloques anteriores en
+// tiempo de ejecución, nunca al cargar.
+// ============================================================
+
+// ---------- Zonas de FC y potencia ----------
+// Por sesión se guarda un HISTOGRAMA (segundos por ppm y por tramo de 10 W),
+// no los minutos por zona: así, si tu umbral cambia, todo el historial se
+// recalcula al vuelo con el umbral nuevo y nada se queda anticuado.
+// Formato compacto: [valorInicial, seg, seg, seg...] denso desde el inicial.
+const ZONAS_VERSION = 1;
+const ZONAS_DT_MAX_S = 10;          // huecos mayores (pausas) no suman tiempo
+const ZONAS_PW_BIN = 10;            // W por casilla del histograma de potencia
+const ZONAS_MIN_SEG = 60;           // menos de 1 min con dato = no hay histograma
+const UMBRAL_FC_VENTANA_SEG = 20 * 60;
+const UMBRAL_FC_VENTANA_DIAS = 90;
+const LS_UMBRAL_FC_MANUAL = 'em_umbral_fc_manual';
+// Zonas de Friel sobre el umbral de lactato por FC, límite INFERIOR de
+// Z2..Z5 en % del umbral (cambian algo entre correr y bici).
+const ZONAS_FC_PCT = { running: [85, 90, 95, 100], cycling: [81, 90, 94, 100] };
+// Zonas de Coggan sobre FTP, límite inferior de Z2..Z6.
+const ZONAS_PW_PCT = [55, 76, 91, 106, 121];
+const ZONAS_COLORES = ['#5A6274', 'var(--teal)', 'var(--amber)', '#CF7A49', 'var(--red)', '#8E2F28'];
+
+function histogramaDeTrack(points) {
+  const pts = (points || []).filter(p => p && p.t != null);
+  const hr = new Map(), pw = new Map();
+  let segHr = 0, segPw = 0, hayPotencia = false;
+  // Para el pico de 20 min: tiempo en movimiento acumulado y FC×tiempo acumulado
+  const cumT = [0], cumHr = [0];
+  for (let i = 1; i < pts.length; i++) {
+    const dt = (pts[i].t - pts[i - 1].t) / 1000;
+    if (!(dt > 0) || dt > ZONAS_DT_MAX_S) continue;
+    const p = pts[i];
+    if (p.hr != null && p.hr >= 40 && p.hr <= 230) {
+      const b = Math.round(p.hr);
+      hr.set(b, (hr.get(b) || 0) + dt);
+      segHr += dt;
+      cumT.push(cumT[cumT.length - 1] + dt);
+      cumHr.push(cumHr[cumHr.length - 1] + p.hr * dt);
+    }
+    if (p.pw != null && p.pw >= 0 && p.pw < 2500) {
+      if (p.pw > 0) hayPotencia = true;
+      const b = Math.floor(p.pw / ZONAS_PW_BIN);
+      pw.set(b, (pw.get(b) || 0) + dt);
+      segPw += dt;
+    }
+  }
+  const denso = (m) => {
+    const claves = [...m.keys()];
+    const min = Math.min(...claves), max = Math.max(...claves);
+    const arr = [min];
+    for (let k = min; k <= max; k++) arr.push(Math.round(m.get(k) || 0));
+    return arr;
+  };
+  let fc20 = null;
+  if (cumT[cumT.length - 1] >= UMBRAL_FC_VENTANA_SEG) {
+    let j = 0;
+    for (let i = 1; i < cumT.length; i++) {
+      while (j < i && cumT[i] - cumT[j + 1] >= UMBRAL_FC_VENTANA_SEG) j++;
+      const span = cumT[i] - cumT[j];
+      if (span >= UMBRAL_FC_VENTANA_SEG) {
+        const m = (cumHr[i] - cumHr[j]) / span;
+        if (fc20 == null || m > fc20) fc20 = m;
+      }
+    }
+  }
+  return {
+    v: ZONAS_VERSION,
+    hr: segHr >= ZONAS_MIN_SEG ? denso(hr) : null,
+    pw: segPw >= ZONAS_MIN_SEG && hayPotencia ? denso(pw) : null,
+    fc20: fc20 != null ? Math.round(fc20) : null
+  };
+}
+
+// Recorre un histograma denso: fn(valorCasilla, segundos)
+function recorrerHisto(h, fn) {
+  if (!h) return;
+  for (let k = 1; k < h.length; k++) if (h[k]) fn(h[0] + k - 1, h[k]);
+}
+
+function leerUmbralManual() {
+  try { return JSON.parse(localStorage.getItem(LS_UMBRAL_FC_MANUAL) || '{}') || {}; } catch (e) { return {}; }
+}
+function guardarUmbralManual(disciplina, valor) {
+  const u = leerUmbralManual();
+  if (valor == null) delete u[disciplina]; else u[disciplina] = valor;
+  localStorage.setItem(LS_UMBRAL_FC_MANUAL, JSON.stringify(u));
+}
+
+// Umbral de FC de una disciplina: el manual si lo has puesto; si no, la
+// mejor FC media de 20 min en tus últimos 90 días (≈ umbral de lactato si
+// en ese tiempo hubo algún esfuerzo duro y sostenido). Sin esfuerzo de
+// 20 min en la ventana → null, y la UI lo dice en vez de inventar zonas.
+function umbralFcDisciplina(sesiones, disciplina, ahora = new Date()) {
+  const manual = leerUmbralManual()[disciplina];
+  if (manual > 0) return { valor: manual, fuente: 'manual' };
+  const desde = fechaLocalStr(new Date(ahora.getTime() - UMBRAL_FC_VENTANA_DIAS * 86400000));
+  let mejor = null;
+  sesiones.forEach(s => {
+    if (categoriaDisciplina(s.tipo) !== disciplina || s.fecha < desde) return;
+    const v = s.zonas?.fc20;
+    if (v != null && (!mejor || v > mejor.valor)) mejor = { valor: v, fuente: 'auto', fecha: s.fecha };
+  });
+  return mejor;
+}
+
+function limitesZonasFc(umbral, disciplina) {
+  return (ZONAS_FC_PCT[disciplina] || ZONAS_FC_PCT.running).map(p => umbral * p / 100);
+}
+function limitesZonasPw(ftp) { return ZONAS_PW_PCT.map(p => ftp * p / 100); }
+function zonaDeValor(valor, limites) {
+  let z = 0;
+  while (z < limites.length && valor >= limites[z]) z++;
+  return z;
+}
+
+// Segundos por zona a partir de un histograma
+function segundosPorZona(h, limites, anchoCasilla = 1) {
+  const seg = new Array(limites.length + 1).fill(0);
+  // centro de la casilla, para no sesgar hacia abajo los tramos de 10 W
+  recorrerHisto(h, (casilla, s) => { seg[zonaDeValor(casilla * anchoCasilla + (anchoCasilla > 1 ? anchoCasilla / 2 : 0), limites)] += s; });
+  return seg;
+}
+
+// Polarización en 3 bloques sobre las zonas de FC: suave = Z1–Z2,
+// umbral = Z3, duro = Z4–Z5.
+function tresBloquesDeZonas(segZonas) {
+  return [segZonas[0] + segZonas[1], segZonas[2], segZonas[3] + segZonas[4]];
+}
+
+// Calcula y guarda histogramas de las sesiones con track que aún no lo
+// tienen (sesiones de antes de esta versión). Lee los tracks uno a uno.
+async function rellenarZonasHistorico(onProgreso) {
+  const sesiones = loadSesionesMeta();
+  const pendientes = sesiones.filter(s => s.tiene_track && s.zonas?.v !== ZONAS_VERSION);
+  let hechas = 0;
+  const parches = {};
+  for (const s of pendientes) {
+    try {
+      const tr = await getTrack(s.id);
+      parches[s.id] = histogramaDeTrack(tr?.points);
+    } catch (e) { console.warn('Zonas: no se pudo leer el track', s.id, e); }
+    hechas++;
+    if (onProgreso) onProgreso(hechas, pendientes.length);
+  }
+  // Una sola escritura al final: más rápido y sin estados a medias
+  const actuales = loadSesionesMeta();
+  actuales.forEach(s => { if (parches[s.id]) s.zonas = parches[s.id]; });
+  saveSesionesMeta(actuales);
+  return { calculadas: Object.keys(parches).length, total: pendientes.length };
+}
+
+function sesionesSinZonas(sesiones) {
+  return sesiones.filter(s => s.tiene_track && s.zonas?.v !== ZONAS_VERSION).length;
+}
+
+// ---------- Barra de zonas de una sesión ----------
+function htmlBarraZonas(titulo, segZonas, etiquetas, pie) {
+  const total = segZonas.reduce((a, b) => a + b, 0);
+  if (!total) return '';
+  const tramos = segZonas.map((s, i) => s > 0
+    ? `<span style="width:${(s / total * 100).toFixed(2)}%; background:${ZONAS_COLORES[i]};"></span>` : '').join('');
+  const leyenda = segZonas.map((s, i) => s >= 30
+    ? `<span class="zb-item"><span class="dot-legend" style="background:${ZONAS_COLORES[i]}"></span>${etiquetas[i]} <b>${Math.round(s / 60)}′</b></span>` : '').join('');
+  return `<div class="zonas-barra-card">
+      <span class="desacople-label">${titulo}</span>
+      <div class="zonas-barra">${tramos}</div>
+      <div class="zonas-barra-leyenda">${leyenda}</div>
+      ${pie ? `<p class="hint" style="margin-top:4px; font-size:11px;">${pie}</p>` : ''}
+    </div>`;
+}
+
+function htmlZonasSesion(sesion, sesiones) {
+  const z = sesion.zonas;
+  const disc = categoriaDisciplina(sesion.tipo);
+  if (!z || (disc !== 'running' && disc !== 'cycling')) return '';
+  let html = '';
+  if (z.hr) {
+    const u = umbralFcDisciplina(sesiones, disc);
+    if (u) {
+      const seg = segundosPorZona(z.hr, limitesZonasFc(u.valor, disc));
+      const b = tresBloquesDeZonas(seg), tot = b[0] + b[1] + b[2];
+      const pie = `Umbral ${u.valor} ppm (${u.fuente === 'manual' ? 'puesto a mano' : 'tus mejores 20 min de ' + UMBRAL_FC_VENTANA_DIAS + ' días'}) · suave ${Math.round(b[0] / tot * 100)}% · umbral ${Math.round(b[1] / tot * 100)}% · duro ${Math.round(b[2] / tot * 100)}%`;
+      html += htmlBarraZonas('Tiempo en zonas de FC', seg, ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'], pie);
+    } else {
+      html += `<p class="hint" style="margin:6px 0;">Zonas de FC: sin umbral de ${disc === 'running' ? 'carrera' : 'bici'} todavía — hace falta un esfuerzo de 20 min seguidos en los últimos ${UMBRAL_FC_VENTANA_DIAS} días, o ponerlo a mano en Ajustes.</p>`;
+    }
+  }
+  const ftp = getFtpConfigurado();
+  if (z.pw && disc === 'cycling') {
+    if (ftp) {
+      const seg = segundosPorZona(z.pw, limitesZonasPw(ftp), ZONAS_PW_BIN);
+      html += htmlBarraZonas('Tiempo en zonas de potencia', seg, ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6+'], `Sobre tu FTP configurado (${ftp} W).`);
+    } else {
+      html += `<p class="hint" style="margin:6px 0;">Zonas de potencia: pon tu FTP en Ajustes para verlas.</p>`;
+    }
+  }
+  return html;
+}
+
+// ---------- Reparto de intensidad semanal (polarización) ----------
+const POLAR_SEMANAS = 12;
+
+function lunesDe(fechaStr) {
+  const d = new Date(fechaStr + 'T00:00:00');
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return fechaLocalStr(d);
+}
+
+function calcularPolarizacion(sesiones, ahora = new Date()) {
+  const umbrales = { running: umbralFcDisciplina(sesiones, 'running', ahora), cycling: umbralFcDisciplina(sesiones, 'cycling', ahora) };
+  const lunesHoy = lunesDe(fechaLocalStr(ahora));
+  const semanas = [];
+  for (let k = POLAR_SEMANAS - 1; k >= 0; k--) {
+    const d = new Date(lunesHoy + 'T00:00:00'); d.setDate(d.getDate() - k * 7);
+    semanas.push({ lunes: fechaLocalStr(d), seg: [0, 0, 0], n: 0 });
+  }
+  const idx = Object.fromEntries(semanas.map((s, i) => [s.lunes, i]));
+  let sinUmbral = 0, sinPulso = 0;
+  sesiones.forEach(s => {
+    const disc = categoriaDisciplina(s.tipo);
+    if (disc !== 'running' && disc !== 'cycling') return;
+    const i = idx[lunesDe(s.fecha)];
+    if (i == null) return;
+    if (!s.zonas?.hr) { if (s.zonas) sinPulso++; return; }
+    const u = umbrales[disc];
+    if (!u) { sinUmbral++; return; }
+    const b = tresBloquesDeZonas(segundosPorZona(s.zonas.hr, limitesZonasFc(u.valor, disc)));
+    b.forEach((v, j) => { semanas[i].seg[j] += v; });
+    semanas[i].n++;
+  });
+  const ult4 = semanas.slice(-4).reduce((acc, s) => acc.map((v, j) => v + s.seg[j]), [0, 0, 0]);
+  const tot4 = ult4[0] + ult4[1] + ult4[2];
+  return {
+    semanas, umbrales, sinUmbral, sinPulso,
+    pendientes: sesionesSinZonas(sesiones),
+    reparto4: tot4 > 0 ? ult4.map(v => Math.round(v / tot4 * 100)) : null,
+    min4: Math.round(tot4 / 60)
+  };
+}
+
+function fechaCortaEs(fechaStr) {
+  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const [, m, d] = fechaStr.split('-');
+  return `${Number(d)} ${meses[Number(m) - 1]}`;
+}
+
+function generarSvgPolarizacion(semanas) {
+  const W = 320, H = 110, mB = 14, gap = 4;
+  const maxSeg = Math.max(1, ...semanas.map(s => s.seg[0] + s.seg[1] + s.seg[2]));
+  const anchoBarra = (W - gap * (semanas.length - 1)) / semanas.length;
+  const colores = [ZONAS_COLORES[1], ZONAS_COLORES[2], ZONAS_COLORES[4]];
+  const puntos = [];
+  let barras = '';
+  semanas.forEach((s, i) => {
+    const x = i * (anchoBarra + gap);
+    const tot = s.seg[0] + s.seg[1] + s.seg[2];
+    let y = H - mB;
+    s.seg.forEach((v, j) => {
+      const h = v / maxSeg * (H - mB - 4);
+      if (h > 0) { y -= h; barras += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${anchoBarra.toFixed(1)}" height="${h.toFixed(1)}" fill="${colores[j]}" rx="1.5"/>`; }
+    });
+    if (!tot) barras += `<rect x="${x.toFixed(1)}" y="${H - mB - 2}" width="${anchoBarra.toFixed(1)}" height="2" fill="var(--line)"/>`;
+    const pct = j => tot ? Math.round(s.seg[j] / tot * 100) : 0;
+    puntos.push([x + anchoBarra / 2, null, tot
+      ? `Semana del ${fechaCortaEs(s.lunes)}|${formatoMinutos(tot / 60)} con pulso|Suave ${pct(0)}% · umbral ${pct(1)}% · duro ${pct(2)}%`
+      : `Semana del ${fechaCortaEs(s.lunes)}|Sin minutos con pulso`]);
+  });
+  const ultimaI = semanas.length - 1;
+  const etiquetas = [0, Math.floor(semanas.length / 2), ultimaI].map(i =>
+    `<text x="${i === 0 ? 0 : i === ultimaI ? W : (i * (anchoBarra + gap) + anchoBarra / 2).toFixed(1)}" y="${H - 3}" text-anchor="${i === 0 ? 'start' : i === ultimaI ? 'end' : 'middle'}" font-size="8.5" fill="var(--text-dim)" font-family="'JetBrains Mono',monospace">${fechaCortaEs(semanas[i].lunes)}</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="radar-svg" ${atributoScrub(W, H, puntos)}>${barras}${etiquetas}</svg>`;
+}
+
+function renderPolarizacionWidget() {
+  const el = document.getElementById('polarizacionWidget');
+  if (!el) return;
+  const sesiones = loadSesionesMeta();
+  const r = calcularPolarizacion(sesiones);
+  const txtUmbral = d => r.umbrales[d] ? `${r.umbrales[d].valor} ppm${r.umbrales[d].fuente === 'manual' ? ' (manual)' : ''}` : 'sin dato';
+  const botonPendientes = r.pendientes > 0
+    ? `<button class="primary-btn" id="polarRellenarBtn" style="margin-top:10px;">Calcular zonas de ${r.pendientes} ${r.pendientes === 1 ? 'sesión antigua' : 'sesiones antiguas'}</button><div class="status" id="polarRellenarStatus"></div>`
+    : '';
+  let cuerpo;
+  if (!r.reparto4 && r.semanas.every(s => s.n === 0)) {
+    cuerpo = estadoVacioHtml(r.pendientes > 0
+      ? 'Tus sesiones aún no tienen zonas calculadas. Pulsa el botón para leerlas una vez; las nuevas se calculan solas al importar.'
+      : (!r.umbrales.running && !r.umbrales.cycling
+        ? `Hace falta un umbral de FC: un esfuerzo de 20 min seguidos en los últimos ${UMBRAL_FC_VENTANA_DIAS} días, o ponerlo a mano en Ajustes.`
+        : `Sin sesiones de carrera o bici con pulso en las últimas ${POLAR_SEMANAS} semanas.`));
+  } else {
+    const rep = r.reparto4;
+    cuerpo = `
+      ${rep ? `<div class="polar-resumen">
+        <div><span class="polar-num" style="color:${ZONAS_COLORES[1]}">${rep[0]}%</span><span class="hint">suave</span></div>
+        <div><span class="polar-num" style="color:${ZONAS_COLORES[2]}">${rep[1]}%</span><span class="hint">umbral</span></div>
+        <div><span class="polar-num" style="color:${ZONAS_COLORES[4]}">${rep[2]}%</span><span class="hint">duro</span></div>
+      </div>
+      <p class="hint" style="margin-top:6px;">Últimas 4 semanas · ${formatoMinutos(r.min4)} de carrera y bici con pulso.</p>` : ''}
+      <div style="margin-top:10px;">${generarSvgPolarizacion(r.semanas)}</div>
+      <div class="pmc-chart-legend">
+        <span><span class="dot-legend" style="background:${ZONAS_COLORES[1]}"></span>Suave Z1–Z2</span>
+        <span><span class="dot-legend" style="background:${ZONAS_COLORES[2]}"></span>Umbral Z3</span>
+        <span><span class="dot-legend" style="background:${ZONAS_COLORES[4]}"></span>Duro Z4–Z5</span>
+      </div>`;
+  }
+  const avisos = [];
+  if (r.sinUmbral) avisos.push(`${r.sinUmbral} ${r.sinUmbral === 1 ? 'sesión no cuenta' : 'sesiones no cuentan'} porque su disciplina no tiene umbral todavía`);
+  if (r.sinPulso) avisos.push(`${r.sinPulso} sin pulso`);
+  el.innerHTML = `<div class="card">
+      <h3>Reparto de intensidad</h3>
+      <p class="hint">Minutos por bloque de FC en carrera y bici, semana a semana. Se calcula con tu umbral actual: carrera ${txtUmbral('running')} · bici ${txtUmbral('cycling')}.</p>
+      ${cuerpo}
+      ${avisos.length ? `<p class="hint" style="margin-top:6px; opacity:.8;">${avisos.join(' · ')}.</p>` : ''}
+      ${botonPendientes}
+    </div>`;
+  const btn = el.querySelector('#polarRellenarBtn');
+  if (btn) btn.addEventListener('click', () => lanzarRellenoZonas(btn, el.querySelector('#polarRellenarStatus')));
+}
+
+async function lanzarRellenoZonas(btn, statusEl) {
+  btn.disabled = true;
+  try {
+    const r = await rellenarZonasHistorico((h, t) => { btn.textContent = `Leyendo tracks… ${h}/${t}`; });
+    if (statusEl) { statusEl.textContent = `✓ Zonas calculadas en ${r.calculadas} sesiones.`; statusEl.className = 'status ok'; }
+  } catch (e) {
+    console.error(e);
+    if (statusEl) { statusEl.textContent = 'Error calculando zonas: ' + e.message; statusEl.className = 'status err'; }
+  }
+  renderPolarizacionWidget();
+  renderUmbralFcAjustes();
+}
+
+// ---------- Tarjeta de Ajustes: umbral de FC ----------
+function renderUmbralFcAjustes() {
+  const el = document.getElementById('umbralFcAjustes');
+  if (!el) return;
+  const sesiones = loadSesionesMeta();
+  const manual = leerUmbralManual();
+  const fila = (disc, nombre) => {
+    // valor automático aunque haya uno manual, para poder compararlos
+    const desde = fechaLocalStr(new Date(Date.now() - UMBRAL_FC_VENTANA_DIAS * 86400000));
+    let mejor = null;
+    sesiones.forEach(s => {
+      if (categoriaDisciplina(s.tipo) !== disc || s.fecha < desde) return;
+      const v = s.zonas?.fc20;
+      if (v != null && (!mejor || v > mejor.valor)) mejor = { valor: v, fecha: s.fecha };
+    });
+    const autoTxt = mejor ? `Automático: <b>${mejor.valor} ppm</b> (mejores 20 min, ${fechaCortaEs(mejor.fecha)})` : `Automático: sin esfuerzo de 20 min en ${UMBRAL_FC_VENTANA_DIAS} días`;
+    return `<div class="umbral-fila">
+        <span class="field-label">${nombre}</span>
+        <p class="hint">${autoTxt}</p>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="number" class="umbral-input" data-disc="${disc}" placeholder="${mejor ? mejor.valor : 'ppm'}" value="${manual[disc] || ''}" min="100" max="220" step="1" style="margin-bottom:0;">
+          <button class="primary-btn umbral-guardar" data-disc="${disc}" style="width:auto; margin-bottom:0;">${manual[disc] ? 'Cambiar' : 'Fijar'}</button>
+          ${manual[disc] ? `<button class="primary-btn umbral-quitar" data-disc="${disc}" style="width:auto; margin-bottom:0; background:var(--surface-2); color:var(--text-dim); border:1px solid var(--line);">Auto</button>` : ''}
+        </div>
+      </div>`;
+  };
+  const pendientes = sesionesSinZonas(sesiones);
+  el.innerHTML = `
+    ${fila('running', 'Carrera')}
+    ${fila('cycling', 'Bici')}
+    ${pendientes ? `<button class="primary-btn" id="umbralRellenarBtn" style="margin-top:10px;">Calcular zonas de ${pendientes} ${pendientes === 1 ? 'sesión antigua' : 'sesiones antiguas'}</button>` : ''}
+    <div class="status" id="umbralFcStatus"></div>`;
+  el.querySelectorAll('.umbral-guardar').forEach(b => b.addEventListener('click', () => {
+    const inp = el.querySelector(`.umbral-input[data-disc="${b.dataset.disc}"]`);
+    const v = Number(inp.value);
+    const st = el.querySelector('#umbralFcStatus');
+    if (!(v >= 100 && v <= 220)) { st.textContent = 'Pon un valor entre 100 y 220 ppm.'; st.className = 'status err'; return; }
+    guardarUmbralManual(b.dataset.disc, Math.round(v));
+    renderUmbralFcAjustes(); renderPolarizacionWidget();
+  }));
+  el.querySelectorAll('.umbral-quitar').forEach(b => b.addEventListener('click', () => {
+    guardarUmbralManual(b.dataset.disc, null);
+    renderUmbralFcAjustes(); renderPolarizacionWidget();
+  }));
+  const rb = el.querySelector('#umbralRellenarBtn');
+  if (rb) rb.addEventListener('click', () => lanzarRellenoZonas(rb, el.querySelector('#umbralFcStatus')));
+}
+
+// ============================================================
+// GRÁFICOS TÁCTILES
+// Cualquier <svg> con atributo data-scrub se vuelve "deslizable": al
+// arrastrar el dedo en horizontal aparece una línea y una etiqueta con los
+// valores del punto más cercano. El desplazamiento vertical de la página
+// sigue funcionando (touch-action: pan-y). Delegado en document, así
+// funciona aunque el gráfico se vuelva a pintar con innerHTML.
+// data-scrub = {w, h, p:[[x, y|null, "línea1|línea2"], ...], l?:0}
+// Además lanza un evento 'scrub' en el svg con detail.i (índice del punto).
+// ============================================================
+function escAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+function atributoScrub(w, h, puntos, opciones = {}) {
+  const p = puntos.map(([x, y, t]) => [Math.round(x * 10) / 10, y == null ? null : Math.round(y * 10) / 10, t || '']);
+  return `data-scrub="${escAttr(JSON.stringify({ w, h, p, ...opciones }))}"`;
+}
+
+const _scrubDatos = new WeakMap();
+let _scrubSvgActivo = null;
+let _scrubCapa = null;
+
+function _datosScrub(svg) {
+  let d = _scrubDatos.get(svg);
+  if (d === undefined) {
+    try { d = JSON.parse(svg.getAttribute('data-scrub')); } catch (e) { d = null; }
+    _scrubDatos.set(svg, d);
+  }
+  return d;
+}
+
+function _ocultarScrub() {
+  if (_scrubCapa) { _scrubCapa.remove(); _scrubCapa = null; }
+  if (_scrubSvgActivo) _scrubSvgActivo.dispatchEvent(new CustomEvent('scrubfin'));
+  _scrubSvgActivo = null;
+}
+
+function _moverScrub(svg, clientX) {
+  const d = _datosScrub(svg);
+  if (!d || !d.p || !d.p.length) return;
+  const rect = svg.getBoundingClientRect();
+  if (!rect.width) return;
+  const vx = (clientX - rect.left) / rect.width * d.w;
+  // búsqueda binaria del punto más cercano (los x vienen ordenados)
+  let lo = 0, hi = d.p.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (d.p[mid][0] < vx) lo = mid; else hi = mid; }
+  const i = Math.abs(d.p[lo][0] - vx) <= Math.abs(d.p[hi][0] - vx) ? lo : hi;
+  const [x, y, texto] = d.p[i];
+
+  const host = svg.parentElement;
+  if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+  if (!_scrubCapa || _scrubCapa.parentElement !== host) {
+    if (_scrubCapa) _scrubCapa.remove();
+    _scrubCapa = document.createElement('div');
+    _scrubCapa.className = 'scrub-capa';
+    _scrubCapa.innerHTML = '<div class="scrub-linea"></div><div class="scrub-punto"></div><div class="scrub-etiqueta"></div>';
+    host.appendChild(_scrubCapa);
+  }
+  const hostRect = host.getBoundingClientRect();
+  const left = rect.left - hostRect.left + (x / d.w) * rect.width;
+  const top = rect.top - hostRect.top;
+  const linea = _scrubCapa.children[0], punto = _scrubCapa.children[1], etiqueta = _scrubCapa.children[2];
+  linea.style.display = d.l === 0 ? 'none' : '';
+  linea.style.left = left + 'px'; linea.style.top = top + 'px'; linea.style.height = rect.height + 'px';
+  if (y != null) { punto.style.display = ''; punto.style.left = left + 'px'; punto.style.top = (top + (y / d.h) * rect.height) + 'px'; }
+  else punto.style.display = 'none';
+  if (texto) {
+    etiqueta.style.display = '';
+    etiqueta.innerHTML = texto.split('|').map((l, k) => k === 0 ? `<b>${l}</b>` : l).join('<br>');
+    const derecha = left > hostRect.width * 0.55;
+    etiqueta.style.top = Math.max(0, top - 4) + 'px';
+    etiqueta.style.left = derecha ? '' : (left + 8) + 'px';
+    etiqueta.style.right = derecha ? (hostRect.width - left + 8) + 'px' : '';
+  } else etiqueta.style.display = 'none';
+  _scrubSvgActivo = svg;
+  svg.dispatchEvent(new CustomEvent('scrub', { detail: { i } }));
+}
+
+(function iniciarScrub() {
+  if (typeof document === 'undefined' || !document.addEventListener) return;
+  document.addEventListener('pointerdown', e => {
+    const svg = e.target.closest && e.target.closest('svg[data-scrub]');
+    if (!svg) { if (_scrubCapa) _ocultarScrub(); return; }
+    _moverScrub(svg, e.clientX);
+  }, { passive: true });
+  document.addEventListener('pointermove', e => {
+    let svg = _scrubSvgActivo;
+    if (e.pointerType === 'mouse') svg = e.target.closest && e.target.closest('svg[data-scrub]');
+    else if (!(e.buttons & 1) && e.pointerType !== 'touch') return;
+    if (!svg) { if (e.pointerType === 'mouse' && _scrubCapa) _ocultarScrub(); return; }
+    _moverScrub(svg, e.clientX);
+  }, { passive: true });
+  // Si el gesto acaba siendo un desplazamiento vertical, el navegador lo
+  // cancela: se oculta para no dejar una etiqueta flotando.
+  document.addEventListener('pointercancel', () => { if (_scrubCapa) _ocultarScrub(); }, { passive: true });
+  window.addEventListener('scroll', () => { if (_scrubCapa) _ocultarScrub(); }, { passive: true });
+})();
+
+// ---------- Curva de potencia-duración (para la tarjeta de la curva) ----------
+function generarSvgCurvaPotenciaDuracion(records, unidad = 'W') {
+  const pts = (records || []).filter(r => r.valor != null && r.seg > 0).sort((a, b) => a.seg - b.seg);
+  if (pts.length < 3) return '';
+  const W = 320, H = 120, mL = 30, mR = 8, mT = 8, mB = 16;
+  const lx0 = Math.log(pts[0].seg), lx1 = Math.log(pts[pts.length - 1].seg);
+  const vMax = Math.max(...pts.map(p => p.valor)), vMin = Math.min(...pts.map(p => p.valor));
+  const y0 = Math.floor(vMin * 0.9 / 10) * 10, y1 = Math.ceil(vMax * 1.05 / 10) * 10;
+  const sx = s => mL + (Math.log(s) - lx0) / Math.max(1e-6, lx1 - lx0) * (W - mL - mR);
+  const sy = v => H - mB - (v - y0) / Math.max(1, y1 - y0) * (H - mT - mB);
+  const linea = pts.map(p => `${sx(p.seg).toFixed(1)},${sy(p.valor).toFixed(1)}`).join(' ');
+  const area = `${sx(pts[0].seg).toFixed(1)},${H - mB} ${linea} ${sx(pts[pts.length - 1].seg).toFixed(1)},${H - mB}`;
+  const etiquetasX = pts.filter((_, i) => i === 0 || i === pts.length - 1 || i === Math.floor(pts.length / 2))
+    .map(p => `<text x="${sx(p.seg).toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="8.5" fill="var(--text-dim)" font-family="'JetBrains Mono',monospace">${p.label}</text>`).join('');
+  const etiquetasY = [y0, y1].map(v => `<text x="${mL - 4}" y="${(sy(v) + 3).toFixed(1)}" text-anchor="end" font-size="8.5" fill="var(--text-dim)" font-family="'JetBrains Mono',monospace">${v}</text>`).join('');
+  const puntos = pts.map(p => [sx(p.seg), sy(p.valor), `${p.label}|${p.valor} ${unidad}${p.fecha ? '|' + p.fecha : ''}`]);
+  return `<svg viewBox="0 0 ${W} ${H}" class="radar-svg" ${atributoScrub(W, H, puntos)}>
+      <polygon points="${area}" fill="var(--amber)" opacity="0.14"/>
+      <polyline points="${linea}" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linejoin="round"/>
+      ${pts.map(p => `<circle cx="${sx(p.seg).toFixed(1)}" cy="${sy(p.valor).toFixed(1)}" r="2.2" fill="var(--amber)"/>`).join('')}
+      ${etiquetasX}${etiquetasY}
+    </svg>`;
+}
+
+// ============================================================
+// GRÁFICO DE LA SESIÓN
+// Franjas apiladas sobre el mismo eje (distancia o tiempo): altitud, FC,
+// potencia, ritmo/velocidad y cadencia — solo las que tengan dato. El track
+// se agrupa en ~300 tramos con su media, que suaviza el ruido del GPS sin
+// esconder cambios reales de esfuerzo.
+// ============================================================
+const SG_TRAMOS = 300;
+const SG_ALTO_FRANJA = 42, SG_GAP = 8, SG_ANCHO = 320, SG_ALTO_EJE = 14, SG_MARGEN_IZQ = 2;
+
+function construirSerieGraficoSesion(points, ejeDistancia, esRunning) {
+  const pts = (points || []).filter(p => p && p.t != null);
+  if (pts.length < 20) return null;
+  const t0 = pts[0].t;
+  // distancia acumulada (m): Rouvy trae la suya (vd); en exterior, GPS
+  const dist = new Array(pts.length).fill(null);
+  let d = 0, hayDist = false;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    if (p.vd != null) { d = p.vd; hayDist = true; }
+    else if (i > 0 && p.lat != null && pts[i - 1].lat != null) {
+      const paso = haversine(pts[i - 1].lat, pts[i - 1].lon, p.lat, p.lon);
+      if (paso < 200) { d += paso; hayDist = true; } // salto de GPS absurdo = se ignora
+    }
+    dist[i] = d;
+  }
+  const usarDist = ejeDistancia && hayDist && d > 500;
+  const xDe = i => usarDist ? dist[i] : (pts[i].t - t0) / 1000;
+  const xMax = xDe(pts.length - 1);
+  if (!(xMax > 0)) return null;
+  const tramos = Array.from({ length: SG_TRAMOS }, () => ({ hr: [0, 0], pw: [0, 0], cad: [0, 0], spd: [0, 0], alt: [0, 0], lat: null, lon: null, t: null, d: null }));
+  const suma = (acc, v) => { if (v != null) { acc[0] += v; acc[1]++; } };
+  for (let i = 0; i < pts.length; i++) {
+    const k = Math.min(SG_TRAMOS - 1, Math.floor(xDe(i) / xMax * SG_TRAMOS));
+    const p = pts[i], tr = tramos[k];
+    if (p.hr >= 40 && p.hr <= 230) suma(tr.hr, p.hr);
+    if (p.pw != null && p.pw >= 0 && p.pw < 2500) suma(tr.pw, p.pw);
+    if (p.cad > 0) suma(tr.cad, p.cad);
+    if (p.spd != null && p.spd >= 0) suma(tr.spd, p.spd);
+    const alt = p.alt ?? p.valt;
+    if (alt != null) suma(tr.alt, alt);
+    if (tr.t == null) { tr.t = (p.t - t0) / 1000; tr.d = dist[i]; }
+    if (tr.lat == null && p.lat != null) { tr.lat = p.lat; tr.lon = p.lon; }
+  }
+  const media = a => a[1] ? a[0] / a[1] : null;
+  const serie = tramos.map((tr, k) => ({
+    x: (k + 0.5) / SG_TRAMOS * xMax,
+    hr: media(tr.hr), pw: media(tr.pw), cad: media(tr.cad), alt: media(tr.alt),
+    spd: media(tr.spd), t: tr.t, d: tr.d, lat: tr.lat, lon: tr.lon
+  })).filter(s => s.t != null);
+  // ritmo (running) en min/km; velocidad (bici) en km/h
+  serie.forEach(s => {
+    s.vel = s.spd != null ? (esRunning ? (s.spd > 0.8 ? 1000 / s.spd / 60 : null) : s.spd * 3.6) : null;
+  });
+  return { serie, usarDist, hayDist: hayDist && d > 500, xMax };
+}
+
+function _rangoRobusto(valores, pBajo = 0.03, pAlto = 0.97) {
+  const v = valores.filter(x => x != null).sort((a, b) => a - b);
+  if (v.length < 2) return null;
+  const lo = v[Math.floor(pBajo * (v.length - 1))], hi = v[Math.ceil(pAlto * (v.length - 1))];
+  return hi > lo ? [lo, hi] : [lo - 1, hi + 1];
+}
+
+function formatoTiempoSeg(seg) {
+  const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = Math.floor(seg % 60);
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function generarSvgGraficoSesion(datos, esRunning) {
+  const { serie, usarDist, xMax } = datos;
+  const def = [
+    { campo: 'alt', nombre: 'Altitud', unidad: 'm', color: 'var(--text-dim)', area: true, fmt: v => `${Math.round(v)} m` },
+    { campo: 'hr', nombre: 'FC', unidad: 'ppm', color: 'var(--red)', fmt: v => `${Math.round(v)} ppm` },
+    { campo: 'pw', nombre: 'Potencia', unidad: 'W', color: 'var(--amber)', fmt: v => `${Math.round(v)} W` },
+    esRunning
+      ? { campo: 'vel', nombre: 'Ritmo', unidad: '/km', color: 'var(--teal)', invertir: true, fmt: v => formatoRitmo(v) }
+      : { campo: 'vel', nombre: 'Velocidad', unidad: 'km/h', color: 'var(--teal)', fmt: v => `${v.toFixed(1)} km/h` },
+    { campo: 'cad', nombre: 'Cadencia', unidad: esRunning ? 'ppm' : 'rpm', color: '#8C93C9', fmt: v => `${Math.round(v)} ${esRunning ? 'pasos/min' : 'rpm'}` }
+  ];
+  const franjas = def.filter(f => {
+    const v = serie.map(s => s[f.campo]).filter(x => x != null);
+    if (v.length < serie.length * 0.2) return false;
+    if (f.campo === 'pw' && !v.some(x => x > 0)) return false;
+    if (f.campo === 'alt') { const r = Math.max(...v) - Math.min(...v); if (r < 8) return false; }
+    return true;
+  });
+  if (!franjas.length) return '';
+  const altoTotal = franjas.length * (SG_ALTO_FRANJA + SG_GAP) + SG_ALTO_EJE;
+  const sx = x => SG_MARGEN_IZQ + x / xMax * (SG_ANCHO - SG_MARGEN_IZQ);
+  let cuerpo = '';
+  franjas.forEach((f, n) => {
+    const top = n * (SG_ALTO_FRANJA + SG_GAP);
+    const rango = f.campo === 'alt' ? _rangoRobusto(serie.map(s => s[f.campo]), 0, 1) : _rangoRobusto(serie.map(s => s[f.campo]));
+    if (!rango) return;
+    const [lo, hi] = rango;
+    const sy = v => {
+      const c = Math.max(lo, Math.min(hi, v));
+      const frac = (c - lo) / (hi - lo);
+      return top + 4 + (f.invertir ? frac : 1 - frac) * (SG_ALTO_FRANJA - 8);
+    };
+    // la línea se corta donde falta dato, en vez de unir con una recta falsa
+    const trozos = [];
+    let actual = [];
+    serie.forEach(s => {
+      const v = s[f.campo];
+      if (v == null) { if (actual.length) trozos.push(actual); actual = []; }
+      else actual.push(`${sx(s.x).toFixed(1)},${sy(v).toFixed(1)}`);
+    });
+    if (actual.length) trozos.push(actual);
+    cuerpo += `<rect x="0" y="${top}" width="${SG_ANCHO}" height="${SG_ALTO_FRANJA}" fill="var(--surface-2)" rx="4" opacity="0.55"/>`;
+    if (f.area) {
+      trozos.forEach(tz => {
+        const primero = tz[0].split(',')[0], ultimo = tz[tz.length - 1].split(',')[0];
+        cuerpo += `<polygon points="${primero},${top + SG_ALTO_FRANJA} ${tz.join(' ')} ${ultimo},${top + SG_ALTO_FRANJA}" fill="${f.color}" opacity="0.28"/>`;
+      });
+    } else {
+      trozos.forEach(tz => { cuerpo += `<polyline points="${tz.join(' ')}" fill="none" stroke="${f.color}" stroke-width="1.4" stroke-linejoin="round"/>`; });
+    }
+    const vals = serie.map(s => s[f.campo]).filter(x => x != null);
+    const med = vals.reduce((a, b) => a + b, 0) / vals.length;
+    cuerpo += `<text x="6" y="${top + 11}" font-size="8.5" fill="var(--text-dim)" font-family="'JetBrains Mono',monospace">${f.nombre.toUpperCase()}</text>`;
+    cuerpo += `<text x="${SG_ANCHO - 5}" y="${top + 11}" text-anchor="end" font-size="8.5" fill="var(--text)" font-family="'JetBrains Mono',monospace">${f.campo === 'alt' ? `${Math.round(lo)}–${Math.round(hi)} m` : 'media ' + f.fmt(med)}</text>`;
+  });
+  // eje X: 4 marcas
+  const yEje = franjas.length * (SG_ALTO_FRANJA + SG_GAP) + 9;
+  let eje = '';
+  for (let k = 0; k <= 4; k++) {
+    const x = xMax * k / 4;
+    const txt = usarDist ? `${(x / 1000).toFixed(x / 1000 < 10 ? 1 : 0)} km` : formatoTiempoSeg(x);
+    eje += `<text x="${(sx(x) + (k === 0 ? 2 : k === 4 ? -2 : 0)).toFixed(1)}" y="${yEje}" text-anchor="${k === 0 ? 'start' : k === 4 ? 'end' : 'middle'}" font-size="8.5" fill="var(--text-dim)" font-family="'JetBrains Mono',monospace">${txt}</text>`;
+  }
+  const puntos = serie.map(s => {
+    const cab = usarDist ? `km ${(s.d / 1000).toFixed(2)} · ${formatoTiempoSeg(s.t)}` : `${formatoTiempoSeg(s.t)}${s.d ? ' · km ' + (s.d / 1000).toFixed(2) : ''}`;
+    const lineas = franjas.filter(f => s[f.campo] != null).map(f => `${f.nombre} ${f.fmt(s[f.campo])}`);
+    return [sx(s.x), null, [cab, ...lineas].join('|')];
+  });
+  return `<svg viewBox="0 0 ${SG_ANCHO} ${altoTotal}" class="sg-svg" ${atributoScrub(SG_ANCHO, altoTotal, puntos)}>${cuerpo}${eje}</svg>`;
+}
+
+// Monta el gráfico en la tarjeta de sesión: botones distancia/tiempo,
+// barra de zonas y el punto que se mueve por el mini-mapa al deslizar.
+function montarGraficoSesion(wrapEl, mapaEl, points, sesion) {
+  if (!wrapEl) return;
+  const esRunning = categoriaDisciplina(sesion.tipo) === 'running';
+  let ejeDistancia = !sesion.es_interior || sesion.es_virtual;
+  const pintar = () => {
+    const datos = construirSerieGraficoSesion(points, ejeDistancia, esRunning);
+    if (!datos) { wrapEl.innerHTML = ''; return; }
+    const svg = generarSvgGraficoSesion(datos, esRunning);
+    if (!svg) { wrapEl.innerHTML = ''; return; }
+    wrapEl.innerHTML = `
+      <div class="sg-cabecera">
+        <span class="desacople-label">Gráfico de la sesión</span>
+        ${datos.hayDist ? `<div class="sg-toggle">
+          <button class="${datos.usarDist ? 'active' : ''}" data-eje="dist">Distancia</button>
+          <button class="${!datos.usarDist ? 'active' : ''}" data-eje="tiempo">Tiempo</button>
+        </div>` : ''}
+      </div>
+      ${svg}
+      <p class="hint" style="font-size:11px; margin-top:2px;">Desliza el dedo sobre el gráfico para ver cada punto${mapaEl && mapaEl.querySelector('svg.mini-mapa-svg') ? ' y dónde estabas en el mapa' : ''}.</p>`;
+    wrapEl.querySelectorAll('.sg-toggle button').forEach(b => b.addEventListener('click', ev => {
+      ev.stopPropagation();
+      ejeDistancia = b.dataset.eje === 'dist';
+      pintar();
+    }));
+    const svgEl = wrapEl.querySelector('svg.sg-svg');
+    const mapaSvg = mapaEl && mapaEl.querySelector('svg.mini-mapa-svg');
+    if (svgEl && mapaSvg) {
+      svgEl.addEventListener('scrub', ev => {
+        const s = datos.serie[ev.detail.i];
+        proyectarEnMiniMapa(mapaSvg, s && s.lat, s && s.lon);
+      });
+      svgEl.addEventListener('scrubfin', () => proyectarEnMiniMapa(mapaSvg, null, null));
+    }
+  };
+  pintar();
+}
+
+// Pone (o quita) el cursor del mini-mapa en unas coordenadas, con la misma
+// proyección que usó generarMiniMapaSvg (guardada en data-proy).
+function proyectarEnMiniMapa(svg, lat, lon) {
+  const cursor = svg.querySelector('.mini-mapa-cursor');
+  if (!cursor) return;
+  let proy;
+  try { proy = JSON.parse(svg.getAttribute('data-proy')); } catch (e) { proy = null; }
+  if (!proy || lat == null || lon == null) { cursor.style.display = 'none'; return; }
+  const x = proy.m + (lon * proy.c - proy.x0) * proy.e;
+  const y = proy.h - proy.m - (lat - proy.y0) * proy.e;
+  cursor.setAttribute('cx', x.toFixed(1));
+  cursor.setAttribute('cy', y.toFixed(1));
+  cursor.style.display = '';
 }
 </script>
   <script>// ============================================================
@@ -10852,6 +11593,7 @@ function renderSesiones() {
       <div class="sess-expand-hint"><span class="sess-expand-arrow">▾</span> detalles</div>
       <div class="sess-detail">
         ${s.tiene_track ? `<div class="mini-mapa-wrap" data-cargado="0"><p class="hint">${s.es_interior ? '🏠 Sesión de interior — toca para ver desacople/espejo (no hay mapa, sin GPS)' : 'Toca para cargar el mapa del recorrido…'}</p></div>` : ''}
+        ${s.tiene_track ? `<div class="sg-wrap"></div><div class="zonas-sesion-wrap"></div>` : ''}
         ${s.tiene_track && categoriaDisciplina(s.tipo) === 'running' ? `<div class="desacople-wrap"></div>` : ''}
         ${s.tiene_track && categoriaDisciplina(s.tipo) === 'running' ? `<div class="forma-wrap"></div>` : ''}
         ${s.tiene_track && (categoriaDisciplina(s.tipo) === 'running' || categoriaDisciplina(s.tipo) === 'cycling') ? `<div class="espejo-wrap" data-session-id="${s.id}"></div>` : ''}
@@ -10881,6 +11623,7 @@ function renderSesiones() {
   el.querySelectorAll('.sess-card').forEach(card => {
     card.addEventListener('click', async (e) => {
       if (e.target.closest('.edit-btn') || e.target.closest('.del-x')) return;
+      if (e.target.closest('.sg-wrap')) return; // deslizar por el gráfico no pliega la ficha
       const abriendo = !card.classList.contains('open');
       card.classList.toggle('open');
       if (!abriendo) return;
@@ -10898,6 +11641,18 @@ function renderSesiones() {
         mapaEl.innerHTML = svg || (sesMapa?.es_interior
           ? `<p class="hint">🏠 Sesión de interior${sesMapa.es_virtual ? ' (Rouvy: la ruta es virtual, no se dibuja)' : ''} — sin mapa.</p>`
           : '<p class="hint">Este track no tiene coordenadas suficientes para dibujarlo.</p>');
+
+        // Gráfico de la sesión y zonas. Las sesiones de antes de esta versión
+        // no tienen histograma: se calcula aquí con el track ya leído y se guarda.
+        if (sesMapa) {
+          if (sesMapa.zonas?.v !== ZONAS_VERSION && trackData?.points?.length) {
+            sesMapa.zonas = histogramaDeTrack(trackData.points);
+            actualizarSesion(sesMapa.id, { zonas: sesMapa.zonas });
+          }
+          montarGraficoSesion(card.querySelector('.sg-wrap'), mapaEl, trackData?.points, sesMapa);
+          const zonasEl = card.querySelector('.zonas-sesion-wrap');
+          if (zonasEl) zonasEl.innerHTML = htmlZonasSesion(sesMapa, loadSesionesMeta());
+        }
 
         if (desacopleEl) {
           const sesionActual = loadSesionesMeta().find(x => x.id === card.dataset.id);
@@ -11773,8 +12528,11 @@ function generarSvgPMC(serieCompleta, diasVisibles = pmcVentanaActual) {
   }).join(' ');
 
   const dias = serie.length;
+  const scrubPmc = atributoScrub(ANCHO, ALTO, serie.map((d, i) => [i * stepX,
+    ALTO - MARGEN - (d.ctl / maxVal) * (ALTO - MARGEN * 2),
+    `${fechaCortaEs(d.fecha)}|CTL ${d.ctl} · ATL ${d.atl}|TSB ${d.tsb > 0 ? '+' : ''}${d.tsb} · TSS del día ${Math.round(d.tss || 0)}`]));
   return `
-    <svg viewBox="0 0 ${ANCHO} ${ALTO}" class="pmc-svg" preserveAspectRatio="none">
+    <svg viewBox="0 0 ${ANCHO} ${ALTO}" class="pmc-svg" preserveAspectRatio="none" ${scrubPmc}>
       <polyline points="${puntos('atl')}" fill="none" stroke="var(--amber)" stroke-width="1.6" />
       <polyline points="${puntos('ctl')}" fill="none" stroke="var(--teal)" stroke-width="2" />
     </svg>
@@ -11850,8 +12608,10 @@ function generarSvgTendenciaFTP(serie) {
   }).join(' ');
 
   const delta = valores[valores.length - 1] - valores[0];
+  const scrubFtp = atributoScrub(ANCHO, ALTO, serie.map((p, i) => [i * stepX,
+    ALTO - MARGEN - ((p.ftp - minVal) / rango) * (ALTO - MARGEN * 2), `${p.mes}|FTP est. ${p.ftp} W`]));
   return `
-    <svg viewBox="0 0 ${ANCHO} ${ALTO}" class="pmc-svg" preserveAspectRatio="none">
+    <svg viewBox="0 0 ${ANCHO} ${ALTO}" class="pmc-svg" preserveAspectRatio="none" ${scrubFtp}>
       <polyline points="${puntos}" fill="none" stroke="var(--amber)" stroke-width="2" />
     </svg>
     <div class="pmc-chart-legend">
@@ -11974,8 +12734,11 @@ function generarSvgVo2max(sesiones) {
   }).join(' ');
 
   const delta = Number((valores[valores.length - 1] - valores[0]).toFixed(1));
+  const scrubVo2 = atributoScrub(ANCHO, ALTO, conDato.map((s, i) => [i * stepX,
+    ALTO - MARGEN - ((valores[i] - minVal) / rango) * (ALTO - MARGEN * 2),
+    `${fechaCortaEs(s.fecha)} · ${nombreTipo(s.tipo)}|VO2max ${valores[i]}`]));
   return `
-    <svg viewBox="0 0 ${ANCHO} ${ALTO}" class="pmc-svg" preserveAspectRatio="none">
+    <svg viewBox="0 0 ${ANCHO} ${ALTO}" class="pmc-svg" preserveAspectRatio="none" ${scrubVo2}>
       <polyline points="${puntos}" fill="none" stroke="var(--teal)" stroke-width="2" />
     </svg>
     <div class="pmc-chart-legend">
@@ -12429,8 +13192,9 @@ function generarSvgRioTemporada(datos) {
     return `<line x1="${x}" y1="0" x2="${x}" y2="${ALTO_TOTAL}" stroke="var(--text-dim)" stroke-opacity="${m.etiqueta ? 0.35 : 0.18}" stroke-width="1" vector-effect="non-scaling-stroke" />`;
   }).join('');
 
+  const scrubRio = atributoScrub(ANCHO, ALTO_TOTAL, semanas.map((s, i) => [i * stepX, null, '']), { l: 0 });
   return `
-    <svg viewBox="0 0 ${ANCHO} ${ALTO_TOTAL}" class="rio-svg" preserveAspectRatio="none">
+    <svg viewBox="0 0 ${ANCHO} ${ALTO_TOTAL}" class="rio-svg" preserveAspectRatio="none" ${scrubRio}>
       <line x1="0" y1="${ALTO_RIO + GAP / 2}" x2="${ANCHO}" y2="${ALTO_RIO + GAP / 2}" stroke="var(--line)" stroke-width="1" />
       ${marcasSvg}
       ${bandasSvg}
@@ -12485,18 +13249,23 @@ function renderRioTemporadaWidget() {
   const svg = el.querySelector('.rio-svg');
   const sel = el.querySelector('.rio-sel');
   const detalleEl = el.querySelector('.rio-detalle');
+  // Tocar o deslizar: el evento 'scrub' de los gráficos táctiles da el índice
+  svg.addEventListener('scrub', ev => mostrarSemanaRio(ev.detail.i));
   svg.addEventListener('click', ev => {
     const rect = ev.target.closest('rect[data-i]');
-    if (!rect) return;
-    const i = Number(rect.dataset.i);
+    if (rect) mostrarSemanaRio(Number(rect.dataset.i));
+  });
+  function mostrarSemanaRio(i) {
     const s = datos.semanas[i];
+    if (!s) return;
+    const rect = svg.querySelector(`rect[data-i="${i}"]`);
     const x = Number(rect.getAttribute('x')) + Number(rect.getAttribute('width')) / 2;
     sel.setAttribute('x1', x); sel.setAttribute('x2', x); sel.style.display = '';
     const partes = datos.categorias.filter(c => s.tss[c] > 0).map(c => `${nombreCategoriaDisciplina(c)} ${Math.round(s.tss[c])}`);
     const total = Math.round(datos.categorias.reduce((a, c) => a + (s.tss[c] || 0), 0));
     const dolor = s.dolorProm != null ? ` · Dolor ${s.dolorProm.toFixed(1).replace('.', ',')}/10` : '';
     detalleEl.innerHTML = `<strong>Semana del ${formatoFechaLargaRio(s.semana)}</strong><br>${partes.length ? partes.join(' · ') + ` · Total TSS ${total}` : 'Sin sesiones'}${dolor}`;
-  });
+  }
 }
 
 // ============================================================
@@ -12757,6 +13526,7 @@ document.getElementById('generarWrappedBtn').addEventListener('click', generarWr
 function renderWidgetsEstadisticas() {
   renderRioTemporadaWidget();
   renderVistaUnificadaWidget();
+  renderPolarizacionWidget();
   renderQueCambioWidget();
   renderComparadorMesesWidget();
   renderVamWidget();
@@ -13315,6 +14085,10 @@ function renderCurvaPotenciaWidget() {
           ${comparacionHtml}
           ${ftpDispositivoHtml}
           ${frescuraHtml}
+          ${generarSvgCurvaPotenciaDuracion(r.records) ? `<div style="margin-top:12px;">
+            <span class="field-label">Tu curva (desliza para ver cada duración)</span>
+            ${generarSvgCurvaPotenciaDuracion(r.records)}
+          </div>` : ''}
           <div style="margin-top:10px;">${recordsHtml}</div>
           ${tendenciaSvg ? `
           <div style="margin-top:14px;">
@@ -13487,8 +14261,10 @@ function generarSvgTendenciaEF(serie) {
     return `${x},${y}`;
   }).join(' ');
   const deltaPct = Math.round(((valores[valores.length - 1] - valores[0]) / valores[0]) * 100);
+  const scrubEf = atributoScrub(ANCHO, ALTO, serie.map((p, i) => [i * stepX,
+    ALTO - MARGEN - ((p.ef - minVal) / rango) * (ALTO - MARGEN * 2), `${p.fecha}|EF ${p.ef}`]));
   return `
-    <svg viewBox="0 0 ${ANCHO} ${ALTO}" class="pmc-svg" preserveAspectRatio="none">
+    <svg viewBox="0 0 ${ANCHO} ${ALTO}" class="pmc-svg" preserveAspectRatio="none" ${scrubEf}>
       <polyline points="${puntos}" fill="none" stroke="var(--teal)" stroke-width="2" />
     </svg>
     <div class="pmc-chart-legend">
@@ -15809,6 +16585,7 @@ renderEstadisticas();
 renderZapatillas();
 renderPesos();
 renderBicis();
+renderUmbralFcAjustes();
 renderSuenoWidget();
 renderHeaderRio();
 </script>
