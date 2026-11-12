@@ -643,6 +643,21 @@
   .umbral-fila{ margin-top:10px; }
   .umbral-fila .hint{ margin:2px 0 6px; }
   .umbral-input{ width:100%; padding:10px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:13px; }
+  /* ---- Entrega 2: monotonía y mini-tendencias ---- */
+  .monotonia-linea{ display:flex; flex-direction:column; gap:2px; margin-top:10px; padding:8px 10px; border-radius:9px; background:var(--surface-2); }
+  .monotonia-linea b{ color:var(--text); font-family:'JetBrains Mono',monospace; font-weight:500; }
+  .monotonia-linea.down{ border:1px solid rgba(193,72,62,.55); }
+  .tend-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:4px; }
+  .tend-card{ background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:11px 12px 9px; display:flex; flex-direction:column; gap:2px; min-width:0; position:relative; }
+  .tend-nombre{ font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-dim); }
+  .tend-valor{ font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:600; letter-spacing:-.02em; line-height:1.15; }
+  .tend-valor small{ font-size:13px; color:var(--text-dim); margin-left:2px; font-weight:500; }
+  .tend-spark{ width:100%; height:auto; display:block; margin:4px 0 2px; }
+  .tend-delta{ font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--text-dim); }
+  .tend-delta.up{ color:var(--teal); }
+  .tend-delta.down{ color:var(--red); }
+  .tend-pie{ font-size:11px; margin:2px 2px 0; opacity:.8; }
+  #miniTendenciasWidget + .section-divider{ margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
 </style>
 </head>
 <body>
@@ -701,10 +716,12 @@
     </div>
 
     <div class="tab-panel" id="panel-estadisticas">
+      <div id="miniTendenciasWidget"></div>
       <div class="section-divider"><span class="dot"></span> Cómo voy</div>
       <div id="rioTemporadaWidget"></div>
       <div id="vistaUnificadaWidget"></div>
       <div id="polarizacionWidget"></div>
+      <div id="monotoniaWidget"></div>
       <div id="statsWidget"></div>
 
       <details class="stats-seccion" data-seccion="cambios">
@@ -10058,7 +10075,7 @@ async function procesarFitFile(arrayBuffer, nombreFichero) {
   // de FTP no tiene que releer todos los tracks cada vez.
   if (categoriaDisciplina(sesionMeta.tipo) === 'cycling' && track.length) sesionMeta.potencia_picos = picosPotenciaDeTrack(track);
   // Histograma de FC/potencia para las zonas (ver bloque de zonas)
-  if (track.length) sesionMeta.zonas = histogramaDeTrack(track);
+  if (track.length) sesionMeta.zonas = histogramaDeTrack(track, sesionMeta.tipo);
   if (sesionMeta.es_interior && categoriaDisciplina(sesionMeta.tipo) === 'cycling') {
     const pf = detectarPruebaFija(track);
     if (pf) sesionMeta.prueba_fija = pf;
@@ -10383,7 +10400,7 @@ async function llamarClaude(apiKey, userMsg) {
 // no los minutos por zona: así, si tu umbral cambia, todo el historial se
 // recalcula al vuelo con el umbral nuevo y nada se queda anticuado.
 // Formato compacto: [valorInicial, seg, seg, seg...] denso desde el inicial.
-const ZONAS_VERSION = 1;
+const ZONAS_VERSION = 2; // v2: añade el EF de la sesión (para las mini-tendencias)
 const ZONAS_DT_MAX_S = 10;          // huecos mayores (pausas) no suman tiempo
 const ZONAS_PW_BIN = 10;            // W por casilla del histograma de potencia
 const ZONAS_MIN_SEG = 60;           // menos de 1 min con dato = no hay histograma
@@ -10397,7 +10414,7 @@ const ZONAS_FC_PCT = { running: [85, 90, 95, 100], cycling: [81, 90, 94, 100] };
 const ZONAS_PW_PCT = [55, 76, 91, 106, 121];
 const ZONAS_COLORES = ['#5A6274', 'var(--teal)', 'var(--amber)', '#CF7A49', 'var(--red)', '#8E2F28'];
 
-function histogramaDeTrack(points) {
+function histogramaDeTrack(points, tipo) {
   const pts = (points || []).filter(p => p && p.t != null);
   const hr = new Map(), pw = new Map();
   let segHr = 0, segPw = 0, hayPotencia = false;
@@ -10444,8 +10461,18 @@ function histogramaDeTrack(points) {
     v: ZONAS_VERSION,
     hr: segHr >= ZONAS_MIN_SEG ? denso(hr) : null,
     pw: segPw >= ZONAS_MIN_SEG && hayPotencia ? denso(pw) : null,
-    fc20: fc20 != null ? Math.round(fc20) : null
+    fc20: fc20 != null ? Math.round(fc20) : null,
+    ef: _efDeSesion(points, tipo)
   };
+}
+
+// EF con la misma definición que el espejo (velocidad o potencia / FC,
+// sin el calentamiento), guardado para no releer tracks en las tendencias
+function _efDeSesion(points, tipo) {
+  const disc = categoriaDisciplina(tipo);
+  if (disc !== 'running' && disc !== 'cycling') return null;
+  const v = calcularEF(points, disc);
+  return v != null && isFinite(v) ? Number(v.toFixed(5)) : null;
 }
 
 // Recorre un histograma denso: fn(valorCasilla, segundos)
@@ -10514,7 +10541,7 @@ async function rellenarZonasHistorico(onProgreso) {
   for (const s of pendientes) {
     try {
       const tr = await getTrack(s.id);
-      parches[s.id] = histogramaDeTrack(tr?.points);
+      parches[s.id] = histogramaDeTrack(tr?.points, s.tipo);
     } catch (e) { console.warn('Zonas: no se pudo leer el track', s.id, e); }
     hechas++;
     if (onProgreso) onProgreso(hechas, pendientes.length);
@@ -10705,6 +10732,7 @@ async function lanzarRellenoZonas(btn, statusEl) {
   }
   renderPolarizacionWidget();
   renderUmbralFcAjustes();
+  renderMiniTendenciasWidget();
 }
 
 // ---------- Tarjeta de Ajustes: umbral de FC ----------
@@ -10828,6 +10856,10 @@ function _moverScrub(svg, clientX) {
     etiqueta.style.top = Math.max(0, top - 4) + 'px';
     etiqueta.style.left = derecha ? '' : (left + 8) + 'px';
     etiqueta.style.right = derecha ? (hostRect.width - left + 8) + 'px' : '';
+    // que no se salga de la pantalla (tarjetas estrechas como las mini-tendencias)
+    const er = etiqueta.getBoundingClientRect(), vw = document.documentElement.clientWidth;
+    if (er.left < 4) { etiqueta.style.right = ''; etiqueta.style.left = (parseFloat(getComputedStyle(etiqueta).left) + 4 - er.left) + 'px'; }
+    else if (er.right > vw - 4) { etiqueta.style.left = ''; etiqueta.style.right = (parseFloat(getComputedStyle(etiqueta).right) + er.right - vw + 4) + 'px'; }
   } else etiqueta.style.display = 'none';
   _scrubSvgActivo = svg;
   svg.dispatchEvent(new CustomEvent('scrub', { detail: { i } }));
@@ -11070,6 +11102,273 @@ function proyectarEnMiniMapa(svg, lat, lon) {
   cursor.setAttribute('cy', y.toFixed(1));
   cursor.style.display = '';
 }
+
+// ============================================================
+// ENTREGA 2 · MONOTONÍA Y STRAIN (Foster)
+// Monotonía = media del TSS diario de la semana / su desviación (los días
+// de descanso cuentan como 0). Strain = TSS semanal × monotonía. Detecta
+// semanas "todas iguales", que el ACWR no ve: misma carga total, pero sin
+// días fáciles que dejen asimilar.
+// El aviso NO usa el umbral de libro de Foster (2,0): salta cuando el
+// strain está en tu 10 % más alto de las semanas del último año.
+// ============================================================
+const STRAIN_SEMANAS_REF_MIN = 12;   // semanas con carga para tener referencia propia
+const STRAIN_VENTANA_REF_DIAS = 365;
+const STRAIN_PERCENTIL_AVISO = 0.9;
+const STRAIN_SEMANAS_GRAFICO = 24;
+
+function _statsSemana(valores) {
+  const n = valores.length;
+  const suma = valores.reduce((a, b) => a + b, 0);
+  const media = suma / n;
+  const sd = Math.sqrt(valores.reduce((a, v) => a + (v - media) ** 2, 0) / n);
+  // sd 0 con carga = 7 días idénticos (no pasa con días de descanso): se
+  // deja sin número en vez de un infinito que no significa nada
+  const monotonia = suma > 0 && sd > 0 ? media / sd : null;
+  return { suma: Math.round(suma), monotonia: monotonia != null ? Number(monotonia.toFixed(2)) : null,
+    strain: monotonia != null ? Math.round(suma * monotonia) : null };
+}
+
+function _tssDiasDesde(porDia, fechaFin, n) {
+  const vals = [];
+  const d = new Date(fechaFin + 'T00:00:00');
+  d.setDate(d.getDate() - (n - 1));
+  for (let k = 0; k < n; k++) { vals.push(porDia[fechaLocalStr(d)] || 0); d.setDate(d.getDate() + 1); }
+  return vals;
+}
+
+function calcularMonotoniaStrain(sesiones, ahora = new Date()) {
+  const { porDia, primeraFecha } = construirSerieTssDiario(sesiones);
+  if (!primeraFecha) return { disponible: false, motivo: 'Sin sesiones con TSS todavía.' };
+  const hoy = fechaLocalStr(ahora);
+  const actual = _statsSemana(_tssDiasDesde(porDia, hoy, 7)); // últimos 7 días hasta hoy
+
+  // semanas completas (lunes a domingo) anteriores a la actual
+  const lunesActual = lunesDe(hoy);
+  const semanas = [];
+  const d = new Date(lunesDe(primeraFecha) + 'T00:00:00');
+  while (fechaLocalStr(d) < lunesActual) {
+    const lunes = fechaLocalStr(d);
+    const dom = new Date(d); dom.setDate(dom.getDate() + 6);
+    semanas.push({ lunes, ...(_statsSemana(_tssDiasDesde(porDia, fechaLocalStr(dom), 7))) });
+    d.setDate(d.getDate() + 7);
+  }
+  // la semana en curso va al gráfico con los últimos 7 días (lo mismo que en
+  // Hoy): una semana a medias daría una monotonía sin sentido
+  semanas.push({ lunes: lunesActual, enCurso: true, ...actual });
+
+  const desdeRef = fechaLocalStr(new Date(ahora.getTime() - STRAIN_VENTANA_REF_DIAS * 86400000));
+  const ref = semanas.filter(s => !s.enCurso && s.lunes >= desdeRef && s.strain != null).map(s => s.strain).sort((a, b) => a - b);
+  const refMono = semanas.filter(s => !s.enCurso && s.lunes >= desdeRef && s.monotonia != null).map(s => s.monotonia).sort((a, b) => a - b);
+  const conReferencia = ref.length >= STRAIN_SEMANAS_REF_MIN;
+  const p90 = conReferencia ? ref[Math.min(ref.length - 1, Math.floor(STRAIN_PERCENTIL_AVISO * ref.length))] : null;
+  const medianaMono = refMono.length ? refMono[Math.floor(refMono.length / 2)] : null;
+  let estado = 'normal';
+  if (!conReferencia) estado = 'sin_ref';
+  else if (actual.strain != null && actual.strain >= p90) estado = 'alto';
+  return {
+    disponible: true, actual, semanas: semanas.slice(-STRAIN_SEMANAS_GRAFICO),
+    p90, medianaMono, conReferencia, nRef: ref.length, estado
+  };
+}
+
+// Línea compacta para la tarjeta de forma de Hoy
+function htmlMonotoniaHoy(sesiones) {
+  const r = calcularMonotoniaStrain(sesiones);
+  if (!r.disponible) return '';
+  const a = r.actual;
+  if (!a.suma) return '';
+  const clase = r.estado === 'alto' ? 'down' : 'neutral';
+  let texto;
+  if (a.monotonia == null) texto = 'Monotonía —';
+  else texto = `Monotonía <b>${String(a.monotonia).replace('.', ',')}</b> · Strain <b>${a.strain}</b>`;
+  let nota;
+  if (r.estado === 'alto') nota = `⚠️ Strain en tu 10 % más alto del año (≥ ${r.p90}): semana cargada y sin días fáciles.`;
+  else if (r.estado === 'sin_ref') nota = `Sin referencia propia todavía (${r.nRef} de ${STRAIN_SEMANAS_REF_MIN} semanas con carga).`;
+  else nota = `Tu aviso salta a partir de ${r.p90}${r.medianaMono != null ? ` · tu monotonía habitual ${String(r.medianaMono).replace('.', ',')}` : ''}.`;
+  return `<div class="monotonia-linea ${clase}">
+      <span class="hint">Últimos 7 días · ${texto}</span>
+      <span class="hint" style="font-size:11.5px; opacity:.85;">${nota}</span>
+    </div>`;
+}
+
+function generarSvgStrain(r) {
+  const sem = r.semanas;
+  const W = 320, H = 110, mB = 14, mT = 6, gap = 3;
+  const maxV = Math.max(1, r.p90 || 0, ...sem.map(s => s.strain || 0));
+  const ancho = (W - gap * (sem.length - 1)) / sem.length;
+  const sy = v => H - mB - v / maxV * (H - mB - mT);
+  let barras = '';
+  const puntos = [];
+  sem.forEach((s, i) => {
+    const x = i * (ancho + gap);
+    const v = s.strain || 0;
+    const alto = r.p90 != null && v >= r.p90 && !s.enCurso;
+    const color = alto ? 'var(--red)' : 'var(--teal)';
+    if (v > 0) barras += `<rect x="${x.toFixed(1)}" y="${sy(v).toFixed(1)}" width="${ancho.toFixed(1)}" height="${(H - mB - sy(v)).toFixed(1)}" fill="${color}" opacity="${s.enCurso ? 0.45 : 0.85}" rx="1.5"/>`;
+    else barras += `<rect x="${x.toFixed(1)}" y="${H - mB - 2}" width="${ancho.toFixed(1)}" height="2" fill="var(--line)"/>`;
+    puntos.push([x + ancho / 2, v > 0 ? sy(v) : null,
+      `${s.enCurso ? 'Últimos 7 días' : 'Semana del ' + fechaCortaEs(s.lunes)}|TSS ${s.suma} · monotonía ${s.monotonia != null ? String(s.monotonia).replace('.', ',') : '—'}|Strain ${s.strain ?? '—'}${alto ? ' · alto para ti' : ''}`]);
+  });
+  const lineaP90 = r.p90 != null
+    ? `<line x1="0" x2="${W}" y1="${sy(r.p90).toFixed(1)}" y2="${sy(r.p90).toFixed(1)}" stroke="var(--red)" stroke-dasharray="4 3" stroke-width="1" opacity="0.8"/>
+       <text x="${W - 2}" y="${(sy(r.p90) - 3).toFixed(1)}" text-anchor="end" font-size="8.5" fill="var(--red)" font-family="'JetBrains Mono',monospace">tu 10 % alto</text>` : '';
+  const ult = sem.length - 1;
+  const etiquetas = [0, Math.floor(ult / 2), ult].map(i =>
+    `<text x="${i === 0 ? 0 : i === ult ? W : (i * (ancho + gap) + ancho / 2).toFixed(1)}" y="${H - 3}" text-anchor="${i === 0 ? 'start' : i === ult ? 'end' : 'middle'}" font-size="8.5" fill="var(--text-dim)" font-family="'JetBrains Mono',monospace">${fechaCortaEs(sem[i].lunes)}</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="radar-svg" ${atributoScrub(W, H, puntos)}>${barras}${lineaP90}${etiquetas}</svg>`;
+}
+
+function renderMonotoniaWidget() {
+  const el = document.getElementById('monotoniaWidget');
+  if (!el) return;
+  const r = calcularMonotoniaStrain(loadSesionesMeta());
+  if (!r.disponible) { el.innerHTML = `<div class="card"><h3>Monotonía y strain</h3>${estadoVacioHtml(r.motivo)}</div>`; return; }
+  const a = r.actual;
+  el.innerHTML = `<div class="card">
+      <h3>Monotonía y strain</h3>
+      <p class="hint">Monotonía: lo parecidos que son tus días de carga en una semana (sube si no hay días fáciles ni de descanso). Strain: TSS de la semana × monotonía. Una semana cargada <i>y</i> monótona es la que más castiga.</p>
+      <div class="polar-resumen" style="grid-template-columns:repeat(3,1fr);">
+        <div><span class="polar-num">${a.suma}</span><span class="hint">TSS 7 días</span></div>
+        <div><span class="polar-num">${a.monotonia != null ? String(a.monotonia).replace('.', ',') : '—'}</span><span class="hint">monotonía</span></div>
+        <div><span class="polar-num" style="color:${r.estado === 'alto' ? 'var(--red)' : 'var(--text)'}">${a.strain ?? '—'}</span><span class="hint">strain</span></div>
+      </div>
+      <p class="hint" style="margin-top:8px;">${r.conReferencia
+        ? `Tu 10 % más alto del último año empieza en <b>${r.p90}</b>${r.medianaMono != null ? ` · tu monotonía habitual es ${String(r.medianaMono).replace('.', ',')}` : ''}.`
+        : `Aún sin referencia propia: hacen falta ${STRAIN_SEMANAS_REF_MIN} semanas con carga en el último año (llevas ${r.nRef}). Mientras, solo se muestran los valores, sin aviso.`}</p>
+      <div style="margin-top:10px;">${generarSvgStrain(r)}</div>
+      <div class="pmc-chart-legend">
+        <span><span class="dot-legend" style="background:var(--teal)"></span>Strain semanal</span>
+        <span><span class="dot-legend" style="background:var(--red)"></span>En tu 10 % más alto</span>
+        <span>última barra (más clara): últimos 7 días</span>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// ENTREGA 2 · MINI-TENDENCIAS EN STATS
+// Cuatro tarjetas arriba del todo: valor actual, línea de 12 semanas y
+// cambio frente a hace 4 semanas. Cada línea se puede deslizar.
+// ============================================================
+const TEND_SEMANAS = 12;
+const TEND_MIN_PUNTOS = 3;
+
+function _serieSemanal(sesiones, valorDe, agregar = 'mediana', ahora = new Date()) {
+  const lunesHoy = lunesDe(fechaLocalStr(ahora));
+  const semanas = [];
+  for (let k = TEND_SEMANAS - 1; k >= 0; k--) {
+    const d = new Date(lunesHoy + 'T00:00:00'); d.setDate(d.getDate() - k * 7);
+    semanas.push({ lunes: fechaLocalStr(d), vals: [] });
+  }
+  const idx = Object.fromEntries(semanas.map((s, i) => [s.lunes, i]));
+  sesiones.forEach(s => {
+    const i = idx[lunesDe(s.fecha)];
+    if (i == null) return;
+    const v = valorDe(s);
+    if (v != null && isFinite(v)) semanas[i].vals.push(v);
+  });
+  return semanas.map(s => ({
+    lunes: s.lunes,
+    valor: s.vals.length ? (agregar === 'mediana' ? medianaSimple(s.vals) : s.vals[s.vals.length - 1]) : null
+  }));
+}
+
+// Cambio frente a hace 4 semanas: último valor con dato vs el valor con
+// dato más cercano a 4 semanas antes (sin inventar si no hay)
+function _deltaCuatroSemanas(serie) {
+  const conDato = serie.map((p, i) => ({ ...p, i })).filter(p => p.valor != null);
+  if (conDato.length < 2) return null;
+  const ultimo = conDato[conDato.length - 1];
+  const objetivo = ultimo.i - 4;
+  const previos = conDato.filter(p => p.i <= objetivo);
+  if (!previos.length) return null;
+  const ref = previos[previos.length - 1];
+  return { delta: ultimo.valor - ref.valor, desde: ref.lunes };
+}
+
+function calcularMiniTendencias(sesiones, ahora = new Date()) {
+  // CTL: valor del domingo de cada semana (o de hoy en la semana en curso)
+  const pmc = calcularPMC(sesiones, ahora);
+  const ctlPorFecha = Object.fromEntries(pmc.serie.map(d => [d.fecha, d.ctl]));
+  const lunesHoy = lunesDe(fechaLocalStr(ahora));
+  const ctl = [];
+  for (let k = TEND_SEMANAS - 1; k >= 0; k--) {
+    const d = new Date(lunesHoy + 'T00:00:00'); d.setDate(d.getDate() - k * 7);
+    const lunes = fechaLocalStr(d);
+    const fin = new Date(d); fin.setDate(fin.getDate() + 6);
+    const f = k === 0 ? fechaLocalStr(ahora) : fechaLocalStr(fin);
+    ctl.push({ lunes, valor: ctlPorFecha[f] ?? null });
+  }
+  const vo2 = _serieSemanal(sesiones, s => s.datos_suunto?.vo2max_estimado ?? null, 'ultimo', ahora);
+  // EF de carrera en metros por latido (velocidad media en m/min / FC media)
+  const ef = _serieSemanal(sesiones, s => categoriaDisciplina(s.tipo) === 'running' && s.zonas?.ef != null ? s.zonas.ef * 60 : null, 'mediana', ahora);
+  const polar = calcularPolarizacion(sesiones, ahora);
+  const suave = polar.semanas.map(s => {
+    const tot = s.seg[0] + s.seg[1] + s.seg[2];
+    return { lunes: s.lunes, valor: tot >= 20 * 60 ? s.seg[0] / tot * 100 : null };
+  });
+  const tarjeta = (clave, nombre, serie, fmt, unidad, mejorSiSube, nota) => {
+    const n = serie.filter(p => p.valor != null).length;
+    const ultimo = [...serie].reverse().find(p => p.valor != null);
+    return { clave, nombre, serie, fmt, unidad, mejorSiSube, nota, suficiente: n >= TEND_MIN_PUNTOS,
+      actual: ultimo ? ultimo.valor : null, delta: _deltaCuatroSemanas(serie) };
+  };
+  return [
+    tarjeta('ctl', 'CTL', ctl, v => v.toFixed(0), '', true, 'Fondo de forma'),
+    tarjeta('vo2', 'VO2max', vo2, v => v.toFixed(1).replace('.', ','), '', true, 'Estimado del reloj'),
+    tarjeta('ef', 'EF carrera', ef, v => v.toFixed(2).replace('.', ','), 'm/latido', true, 'Metros por latido'),
+    tarjeta('suave', 'Tiempo suave', suave, v => v.toFixed(0), '%', null, 'Z1–Z2 de FC')
+  ];
+}
+
+function generarSvgSparkline(t) {
+  const W = 120, H = 34, m = 3;
+  const pts = t.serie.map((p, i) => ({ ...p, i })).filter(p => p.valor != null);
+  if (pts.length < 2) return '';
+  const vals = pts.map(p => p.valor);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (hi - lo < 1e-9) { lo -= 1; hi += 1; }
+  const sx = i => m + i / (t.serie.length - 1) * (W - 2 * m);
+  const sy = v => H - m - (v - lo) / (hi - lo) * (H - 2 * m);
+  const linea = pts.map(p => `${sx(p.i).toFixed(1)},${sy(p.valor).toFixed(1)}`).join(' ');
+  const u = pts[pts.length - 1];
+  const puntos = pts.map(p => [sx(p.i), sy(p.valor), `Semana del ${fechaCortaEs(p.lunes)}|${t.nombre} ${t.fmt(p.valor)}${t.unidad ? ' ' + t.unidad : ''}`]);
+  return `<svg viewBox="0 0 ${W} ${H}" class="tend-spark" ${atributoScrub(W, H, puntos)}>
+      <polyline points="${linea}" fill="none" stroke="var(--teal)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="${sx(u.i).toFixed(1)}" cy="${sy(u.valor).toFixed(1)}" r="2.4" fill="var(--teal)"/>
+    </svg>`;
+}
+
+function renderMiniTendenciasWidget() {
+  const el = document.getElementById('miniTendenciasWidget');
+  if (!el) return;
+  const tarjetas = calcularMiniTendencias(loadSesionesMeta());
+  el.innerHTML = `<div class="tend-grid">${tarjetas.map(t => {
+    if (!t.suficiente || t.actual == null) {
+      return `<div class="tend-card">
+          <span class="tend-nombre">${t.nombre}</span>
+          <span class="tend-valor" style="color:var(--text-dim);">—</span>
+          <span class="tend-delta">${t.clave === 'ef' ? 'Calcula zonas de tus sesiones' : t.clave === 'suave' ? 'Falta umbral o pulso' : 'Pocos datos en 12 semanas'}</span>
+        </div>`;
+    }
+    let deltaHtml = '<span class="tend-delta">sin dato hace 4 sem</span>';
+    if (t.delta) {
+      const d = t.delta.delta;
+      const plano = Math.abs(d) < (t.clave === 'ef' ? 0.01 : t.clave === 'vo2' ? 0.1 : 0.5);
+      const clase = plano || t.mejorSiSube == null ? '' : ((d > 0) === t.mejorSiSube ? 'up' : 'down');
+      const flecha = plano ? '→' : d > 0 ? '↑' : '↓';
+      deltaHtml = `<span class="tend-delta ${clase}">${flecha} ${d > 0 ? '+' : ''}${t.fmt(d)}${t.unidad === '%' ? ' pts' : ''} vs 4 sem</span>`;
+    }
+    return `<div class="tend-card">
+        <span class="tend-nombre">${t.nombre}</span>
+        <span class="tend-valor">${t.fmt(t.actual)}<small>${t.unidad && t.unidad !== 'm/latido' ? t.unidad : ''}</small></span>
+        ${generarSvgSparkline(t)}
+        ${deltaHtml}
+      </div>`;
+  }).join('')}</div>
+  <p class="hint tend-pie">12 semanas · EF en metros por latido (sube si corres más rápido con el mismo pulso; terreno y calor influyen).</p>`;
+}
+
 </script>
   <script>// ============================================================
 // UI — Wattly (app base)
@@ -11646,7 +11945,7 @@ function renderSesiones() {
         // no tienen histograma: se calcula aquí con el track ya leído y se guarda.
         if (sesMapa) {
           if (sesMapa.zonas?.v !== ZONAS_VERSION && trackData?.points?.length) {
-            sesMapa.zonas = histogramaDeTrack(trackData.points);
+            sesMapa.zonas = histogramaDeTrack(trackData.points, sesMapa.tipo);
             actualizarSesion(sesMapa.id, { zonas: sesMapa.zonas });
           }
           montarGraficoSesion(card.querySelector('.sg-wrap'), mapaEl, trackData?.points, sesMapa);
@@ -13527,6 +13826,8 @@ function renderWidgetsEstadisticas() {
   renderRioTemporadaWidget();
   renderVistaUnificadaWidget();
   renderPolarizacionWidget();
+  renderMonotoniaWidget();
+  renderMiniTendenciasWidget();
   renderQueCambioWidget();
   renderComparadorMesesWidget();
   renderVamWidget();
@@ -14945,6 +15246,7 @@ function renderForma() {
         <div><span class="label">ACWR</span><span class="val ${acwrInfo.clase}">${acwr ?? '—'}</span></div>
       </div>
       ${acwrDisciplinaHtml}
+      ${htmlMonotoniaHoy(sesiones)}
       <div class="stats-period" style="margin-top:8px;">
         <button class="stats-period-btn pmc-ventana-btn ${pmcVentanaActual === 30 ? 'active' : ''}" data-ventana="30">30 días</button>
         <button class="stats-period-btn pmc-ventana-btn ${pmcVentanaActual === 56 ? 'active' : ''}" data-ventana="56">56 días</button>
