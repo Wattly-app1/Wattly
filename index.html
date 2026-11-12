@@ -94,7 +94,7 @@
   .tab-panel{ display:none; }
   .tab-panel.active{ display:block; }
 
-  input[type=file], input[type=text], input[type=password]{
+  input[type=file], input[type=text], input[type=password], input[type=number]{
     width:100%; padding:13px; background:var(--surface); border:1px solid var(--line);
     border-radius:10px; color:var(--text); margin-bottom:12px; font-size:13.5px; font-family:'Inter',sans-serif;
   }
@@ -566,7 +566,7 @@
     border:1px solid var(--amber); background:rgba(214,163,84,.08); color:var(--text);
   }
   .aviso-backup .link-btn{ color:var(--amber); white-space:nowrap; }
-  #avisoFtpWidget + .section-divider{ margin-top:0; padding-top:0; border-top:none; }
+  #avisoMantenimientoWidget + .section-divider{ margin-top:0; padding-top:0; border-top:none; }
   .ftp-chequeo{ margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
 
   /* ---------- Añadir sesión (Registro) ---------- */
@@ -722,6 +722,20 @@
   .bottom-nav .tab-btn.active{ color:var(--text); }
   .bottom-nav .tab-btn.active i[data-ic]{ color:var(--teal); }
   .bottom-nav .tab-btn:active{ background:var(--surface-2); }
+  /* ---- Entrega 4: mantenimiento de la bici ---- */
+  .bici-bloque{ border-top:1px solid var(--line); padding-top:6px; margin-top:10px; }
+  .bici-bloque:first-child{ border-top:none; margin-top:4px; }
+  .bici-defecto-tag{ font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--teal); border:1px solid rgba(76,140,130,.5); border-radius:6px; padding:1px 5px; margin-left:6px; vertical-align:1px; }
+  .comp-item{ padding:10px 0 10px 10px; border-left:2px solid var(--surface-2); margin-left:2px; }
+  .comp-meta{ font-size:11px; margin:-2px 0 8px; }
+  .comp-item .zapatilla-item-actions{ flex-wrap:wrap; gap:6px; }
+  .comp-item .zapatilla-item-actions button{ flex:1 1 auto; white-space:nowrap; padding-left:8px; padding-right:8px; }
+  .comp-anadir{ margin:6px 0 4px 2px; }
+  .comp-anadir summary{ cursor:pointer; list-style:none; color:var(--teal); font-size:13px; padding:6px 0; }
+  .comp-anadir summary::-webkit-details-marker{ display:none; }
+  .comp-anadir .comp-presets{ margin:6px 0 10px; }
+  .aviso-mant.pasada{ border-color:rgba(193,72,62,.6); }
+  .aviso-mant i[data-ic]{ color:var(--amber); }
 </style>
 </head>
 <body>
@@ -843,6 +857,7 @@
     <div class="tab-panel active" id="panel-debrief">
       <div id="avisoBackupWidget"></div>
       <div id="avisoFtpWidget"></div>
+      <div id="avisoMantenimientoWidget"></div>
       <div class="section-divider"><span class="dot"></span> Estado actual</div>
       <div id="queHacerHoyWidget"></div>
       <div id="resumenSemanalWidget"></div>
@@ -980,7 +995,7 @@
 
       <div class="card">
         <h3><i data-ic=bici></i>Bicis guardadas</h3>
-        <p class="hint" style="margin-bottom:10px;">Peso de cada bici, para las simulaciones de puerto (ruta → RUTAS).</p>
+        <p class="hint" style="margin-bottom:10px;">Peso de cada bici (para las simulaciones de puerto) y desgaste de sus piezas. Los km salen de tus sesiones de bici: las que no tienen bici asignada cuentan para la de por defecto. En rodillo solo suman las piezas marcadas para ello; las sesiones de rodillo sin distancia no suman.</p>
         <div class="zapatilla-inputs">
           <input type="text" id="biciNombreInput" placeholder="Nombre (ej. Canyon carretera)">
           <input type="number" id="biciKgInput" placeholder="Kg" min="0" step="0.1">
@@ -1080,6 +1095,11 @@
       <div id="zapatillaFieldWrap" style="display:none;">
         <span class="field-label">Zapatilla</span>
         <div class="chip-group" data-group="zapatilla" id="zapatillaChipGroup"></div>
+      </div>
+
+      <div id="biciFieldWrap" style="display:none;">
+        <span class="field-label">Bici</span>
+        <div class="chip-group" data-group="bici" id="biciChipGroup"></div>
       </div>
 
       <div id="carreraTestFieldWrap" style="display:none;">
@@ -1425,25 +1445,47 @@ function loadBicis() {
 function saveBicis(lista) { localStorage.setItem(LS_BICIS_KEY, JSON.stringify(lista)); }
 function crearBici(nombre, kg) {
   const lista = loadBicis();
-  lista.push({ id: 'bici_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), nombre: nombre.trim() || 'Bici sin nombre', kg: Number(kg) });
+  // la primera bici que guardes es la de por defecto (las sesiones sin bici asignada cuentan para ella)
+  const porDefecto = !lista.some(b => b.por_defecto);
+  lista.push({ id: 'bici_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), nombre: nombre.trim() || 'Bici sin nombre', kg: Number(kg), por_defecto: porDefecto, componentes: [] });
   saveBicis(lista);
 }
-function borrarBici(id) { saveBicis(loadBicis().filter(b => b.id !== id)); }
+function borrarBici(id) {
+  const lista = loadBicis().filter(b => b.id !== id);
+  if (lista.length && !lista.some(b => b.por_defecto)) lista[0].por_defecto = true;
+  saveBicis(lista);
+  // sesiones que apuntaban a esta bici: pasan a la de por defecto
+  const sesiones = loadSesionesMeta();
+  let tocado = false;
+  sesiones.forEach(s => { if (s.registro_manual?.bici_id === id) { s.registro_manual.bici_id = null; tocado = true; } });
+  if (tocado) saveSesionesMeta(sesiones);
+}
 
 function renderBicis() {
   const el = document.getElementById('bicisListado');
   if (!el) return;
   const bicis = loadBicis();
   if (!bicis.length) { el.innerHTML = '<p class="hint" style="margin-top:10px;">Sin bicis guardadas todavía.</p>'; return; }
+  const sesiones = loadSesionesMeta();
+  const def = biciPorDefecto(bicis);
   el.innerHTML = bicis.map(b => `
-    <div class="record-item">
-      <span class="record-label">${b.nombre}</span>
-      <span class="record-val">${b.kg} kg <button class="del-btn bici-del-btn" data-id="${b.id}" title="Borrar">🗑️</button></span>
+    <div class="bici-bloque">
+      <div class="record-item">
+        <span class="record-label">${b.nombre}${def && def.id === b.id ? ' <span class="bici-defecto-tag">por defecto</span>' : ''}</span>
+        <span class="record-val">${b.kg} kg
+          ${def && def.id === b.id || bicis.length < 2 ? '' : `<button class="del-btn bici-defecto-btn" data-id="${b.id}" title="Usar por defecto" style="width:auto; padding:0 8px;">Por defecto</button>`}
+          <button class="del-btn bici-del-btn" data-id="${b.id}" title="Borrar">✕</button></span>
+      </div>
+      ${htmlComponentesBici(b, sesiones, bicis)}
     </div>
   `).join('');
   el.querySelectorAll('.bici-del-btn').forEach(btn => {
-    btn.addEventListener('click', () => { borrarBici(btn.dataset.id); renderBicis(); });
+    btn.addEventListener('click', () => {
+      if (!confirm('¿Borrar esta bici con sus componentes? Sus sesiones pasan a la bici por defecto.')) return;
+      borrarBici(btn.dataset.id); renderBicis(); renderAvisoMantenimiento();
+    });
   });
+  engancharComponentesBici(el);
 }
 
 // ---------- Registro diario de sueño ----------
@@ -11440,6 +11482,229 @@ function renderMiniTendenciasWidget() {
   <p class="hint tend-pie">12 semanas · EF en metros por latido (sube si corres más rápido con el mismo pulso; terreno y calor influyen).</p>`;
 }
 
+
+
+// ============================================================
+// ENTREGA 4 · MANTENIMIENTO DE LA BICI
+// Cada bici guardada puede tener componentes con límite de km. Como en las
+// zapatillas, los km NO se guardan: se derivan de las sesiones de bici
+// asignadas, para que editar o borrar una sesión no desincronice nada.
+//   bici: { id, nombre, kg, por_defecto, componentes: [componente] }
+//   componente: { id, nombre, limite_km, rodillo, desde, km_previos, cambios: [{fecha, km}] }
+// - Sesión con bici_id → cuenta para esa bici. Sin bici_id → para la bici
+//   por defecto (así todo el historial cuenta sin tener que reasignarlo).
+// - desde: fecha+hora de montaje; solo cuentan sesiones posteriores.
+// - rodillo: si cuenta en sesiones de interior (cadena y cassette sí; las
+//   cubiertas y pastillas, no, con rodillo de transmisión directa).
+// ============================================================
+const MANT_AVISO_PCT = 0.9;
+const MANT_PRESETS = [
+  { nombre: 'Cadena', limite_km: 3000, rodillo: true },
+  { nombre: 'Cassette', limite_km: 9000, rodillo: true },
+  { nombre: 'Cubierta trasera', limite_km: 4000, rodillo: false },
+  { nombre: 'Cubierta delantera', limite_km: 6000, rodillo: false },
+  { nombre: 'Pastillas de freno', limite_km: 2500, rodillo: false }
+];
+
+function _ahoraFechaHora() {
+  const d = new Date();
+  return `${fechaLocalStr(d)}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function biciPorDefecto(bicis = loadBicis()) {
+  return bicis.find(b => b.por_defecto) || bicis[0] || null;
+}
+
+function marcarBiciPorDefecto(id) {
+  const bicis = loadBicis();
+  bicis.forEach(b => { b.por_defecto = b.id === id; });
+  saveBicis(bicis);
+}
+
+// Bici de una sesión de bici: la asignada o, si no tiene, la de por defecto
+function biciDeSesion(s, bicis = loadBicis()) {
+  if (categoriaDisciplina(s.tipo) !== 'cycling') return null;
+  const asignada = s.registro_manual?.bici_id;
+  if (asignada && bicis.some(b => b.id === asignada)) return asignada;
+  const def = biciPorDefecto(bicis);
+  return def ? def.id : null;
+}
+
+function kmComponente(comp, biciId, sesiones, bicis = loadBicis()) {
+  const desde = comp.desde || '0000';
+  const km = sesiones
+    .filter(s => biciDeSesion(s, bicis) === biciId)
+    .filter(s => (s.fecha + 'T' + (s.hora || '00:00')) >= desde)
+    .filter(s => comp.rodillo || !s.es_interior)
+    .reduce((acc, s) => acc + (s.datos_suunto.distancia_km || 0), 0);
+  return Math.round((comp.km_previos || 0) + km);
+}
+
+function anadirComponente(biciId, { nombre, limite_km, rodillo, km_previos }) {
+  const bicis = loadBicis();
+  const b = bicis.find(x => x.id === biciId);
+  if (!b) return;
+  b.componentes = b.componentes || [];
+  b.componentes.push({
+    id: 'comp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+    nombre: nombre.trim() || 'Componente', limite_km: Number(limite_km) || 3000,
+    rodillo: !!rodillo, desde: _ahoraFechaHora(), km_previos: Number(km_previos) || 0, cambios: []
+  });
+  saveBicis(bicis);
+}
+
+function _editarComponente(biciId, compId, fn) {
+  const bicis = loadBicis();
+  const b = bicis.find(x => x.id === biciId);
+  const c = b && (b.componentes || []).find(x => x.id === compId);
+  if (!c) return;
+  fn(c, b);
+  saveBicis(bicis);
+}
+
+// "Cambiada": guarda los km con los que se retiró y empieza de cero ahora
+function cambiarComponente(biciId, compId) {
+  const sesiones = loadSesionesMeta(), bicis = loadBicis();
+  _editarComponente(biciId, compId, c => {
+    const km = kmComponente(c, biciId, sesiones, bicis);
+    c.cambios = [...(c.cambios || []), { fecha: fechaLocalStr(new Date()), km }].slice(-10);
+    c.desde = _ahoraFechaHora();
+    c.km_previos = 0;
+  });
+}
+
+function borrarComponente(biciId, compId) {
+  const bicis = loadBicis();
+  const b = bicis.find(x => x.id === biciId);
+  if (!b) return;
+  b.componentes = (b.componentes || []).filter(c => c.id !== compId);
+  saveBicis(bicis);
+}
+
+function claseDesgaste(pct) { return pct >= 1 ? 'down' : pct >= 0.85 ? 'warn' : 'up'; }
+
+function estadoMantenimiento(sesiones = loadSesionesMeta(), bicis = loadBicis()) {
+  const lista = [];
+  bicis.forEach(b => (b.componentes || []).forEach(c => {
+    const km = kmComponente(c, b.id, sesiones, bicis);
+    lista.push({ bici: b, comp: c, km, pct: km / c.limite_km });
+  }));
+  return lista;
+}
+
+function htmlComponentesBici(b, sesiones, bicis) {
+  const comps = b.componentes || [];
+  const filas = comps.map(c => {
+    const km = kmComponente(c, b.id, sesiones, bicis);
+    const pct = km / c.limite_km;
+    const clase = claseDesgaste(pct);
+    const color = clase === 'down' ? 'var(--red)' : clase === 'warn' ? 'var(--amber)' : 'var(--teal)';
+    const ultimo = (c.cambios || []).slice(-1)[0];
+    return `<div class="zapatilla-item comp-item">
+        <div class="zapatilla-item-head">
+          <span class="nombre">${c.nombre}</span>
+          <span class="km ${clase}">${km.toLocaleString('es-ES')} / ${c.limite_km.toLocaleString('es-ES')} km</span>
+        </div>
+        <div class="zapatilla-bar-track"><div class="zapatilla-bar-fill" style="width:${Math.min(100, Math.round(pct * 100))}%; background:${color}"></div></div>
+        <p class="hint comp-meta">Desde el ${fechaCortaEs(c.desde.slice(0, 10))}${c.km_previos ? ` (+${c.km_previos} km previos)` : ''} · ${c.rodillo ? 'cuenta en rodillo' : 'solo exterior'}${ultimo ? ` · último cambio a ${ultimo.km.toLocaleString('es-ES')} km` : ''}</p>
+        <div class="zapatilla-item-actions">
+          <button data-comp-accion="cambiar" data-bici="${b.id}" data-comp="${c.id}">Cambiada</button>
+          <button data-comp-accion="limite" data-bici="${b.id}" data-comp="${c.id}">Límite</button>
+          <button data-comp-accion="rodillo" data-bici="${b.id}" data-comp="${c.id}" title="Cambiar si cuenta en sesiones de rodillo">Rodillo: ${c.rodillo ? 'sí' : 'no'}</button>
+          <button data-comp-accion="borrar" data-bici="${b.id}" data-comp="${c.id}" class="danger">Borrar</button>
+        </div>
+      </div>`;
+  }).join('');
+  const presets = MANT_PRESETS.filter(p => !comps.some(c => c.nombre === p.nombre));
+  return `${filas || '<p class="hint" style="margin:6px 0;">Sin componentes todavía.</p>'}
+    <details class="comp-anadir">
+      <summary>+ Añadir componente</summary>
+      <div class="chip-group comp-presets" data-bici="${b.id}">
+        ${presets.map(p => `<div class="chip" data-nombre="${p.nombre}" data-limite="${p.limite_km}" data-rodillo="${p.rodillo ? 1 : 0}">${p.nombre}</div>`).join('')}
+        <div class="chip" data-nombre="" data-limite="3000" data-rodillo="0">Otro</div>
+      </div>
+      <div class="comp-form" data-bici="${b.id}">
+        <input type="text" class="comp-nombre" placeholder="Nombre">
+        <div class="zapatilla-inputs">
+          <input type="number" class="comp-limite" placeholder="Límite km" min="100" step="100">
+          <input type="number" class="comp-previos" placeholder="Km que ya lleva" min="0" step="10">
+        </div>
+        <label class="hint" style="display:flex; gap:8px; align-items:center; margin-bottom:10px;"><input type="checkbox" class="comp-rodillo"> Cuenta también en rodillo</label>
+        <button class="primary-btn comp-guardar">Añadir</button>
+      </div>
+    </details>`;
+}
+
+// Engancha los botones de componentes dentro del listado de bicis
+function engancharComponentesBici(el) {
+  el.querySelectorAll('button[data-comp-accion]').forEach(btn => btn.addEventListener('click', () => {
+    const { bici, comp } = btn.dataset;
+    const accion = btn.dataset.compAccion;
+    if (accion === 'cambiar') {
+      if (!confirm('¿Has cambiado esta pieza? Se guarda con los km que lleva y empieza de cero desde ahora.')) return;
+      cambiarComponente(bici, comp);
+    } else if (accion === 'limite') {
+      const actual = (loadBicis().find(b => b.id === bici)?.componentes || []).find(c => c.id === comp)?.limite_km;
+      const v = Number(prompt('Límite de km para esta pieza:', actual || ''));
+      if (!(v > 0)) return;
+      _editarComponente(bici, comp, c => { c.limite_km = Math.round(v); });
+    } else if (accion === 'rodillo') {
+      _editarComponente(bici, comp, c => { c.rodillo = !c.rodillo; });
+    } else if (accion === 'borrar') {
+      if (!confirm('¿Borrar este componente y su historial?')) return;
+      borrarComponente(bici, comp);
+    }
+    renderBicis();
+    renderAvisoMantenimiento();
+  }));
+  el.querySelectorAll('.comp-presets').forEach(grupo => grupo.querySelectorAll('.chip').forEach(chip => chip.addEventListener('click', () => {
+    grupo.querySelectorAll('.chip').forEach(c => c.classList.toggle('selected', c === chip));
+    const form = el.querySelector(`.comp-form[data-bici="${grupo.dataset.bici}"]`);
+    form.querySelector('.comp-nombre').value = chip.dataset.nombre;
+    form.querySelector('.comp-limite').value = chip.dataset.limite;
+    form.querySelector('.comp-rodillo').checked = chip.dataset.rodillo === '1';
+    if (!chip.dataset.nombre) form.querySelector('.comp-nombre').focus();
+  })));
+  el.querySelectorAll('.comp-guardar').forEach(btn => btn.addEventListener('click', () => {
+    const form = btn.closest('.comp-form');
+    const nombre = form.querySelector('.comp-nombre').value.trim();
+    const limite = Number(form.querySelector('.comp-limite').value);
+    if (!nombre || !(limite > 0)) { form.querySelector(nombre ? '.comp-limite' : '.comp-nombre').focus(); return; }
+    anadirComponente(form.dataset.bici, {
+      nombre, limite_km: limite,
+      rodillo: form.querySelector('.comp-rodillo').checked,
+      km_previos: form.querySelector('.comp-previos').value
+    });
+    renderBicis();
+    renderAvisoMantenimiento();
+  }));
+  el.querySelectorAll('.bici-defecto-btn').forEach(btn => btn.addEventListener('click', () => {
+    marcarBiciPorDefecto(btn.dataset.id);
+    renderBicis();
+    renderAvisoMantenimiento();
+  }));
+}
+
+// Aviso en Hoy cuando alguna pieza pasa del 90 % de su límite
+function renderAvisoMantenimiento() {
+  const el = document.getElementById('avisoMantenimientoWidget');
+  if (!el) return;
+  const alertas = estadoMantenimiento().filter(x => x.pct >= MANT_AVISO_PCT).sort((a, b) => b.pct - a.pct);
+  if (!alertas.length) { el.innerHTML = ''; return; }
+  const varias = loadBicis().length > 1;
+  const texto = alertas.slice(0, 3).map(a =>
+    `${a.comp.nombre}${varias ? ' (' + a.bici.nombre + ')' : ''} ${a.km.toLocaleString('es-ES')}/${a.comp.limite_km.toLocaleString('es-ES')} km`).join(' · ');
+  const pasada = alertas.some(a => a.pct >= 1);
+  el.innerHTML = `<div class="aviso-backup aviso-mant ${pasada ? 'pasada' : ''}">
+      <span><i data-ic=bici></i>${pasada ? 'Toca cambiar' : 'Pronto toca cambiar'}: ${texto}${alertas.length > 3 ? ` y ${alertas.length - 3} más` : ''}</span>
+      <button class="link-btn" type="button" id="avisoMantBtn">Ver</button>
+    </div>`;
+  document.getElementById('avisoMantBtn').addEventListener('click', () => {
+    cambiarTab('ajustes');
+    setTimeout(() => document.getElementById('bicisListado')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  });
+}
+
 </script>
   <script>// ============================================================
 // UI — Wattly (app base)
@@ -15263,6 +15528,8 @@ function renderForma() {
   const el = document.getElementById('formaWidget');
   renderAvisoBackup();
   renderAvisoFtp();
+  renderAvisoMantenimiento();
+  renderBicis();
   renderChequeoFtp();
   renderResumenSemanal();
   renderRecordsPersonales();
@@ -16902,6 +17169,20 @@ function abrirRegistroModal(sessionId) {
     seleccionarChip('zapatilla', s.registro_manual.zapatilla_id || '');
   }
 
+  // Bici: solo en sesiones de bici y si hay más de una (con una sola no hay nada que elegir)
+  const esBici = categoriaDisciplina(s.tipo) === 'cycling';
+  const bicisGuardadas = loadBicis();
+  const wrapBici = document.getElementById('biciFieldWrap');
+  wrapBici.style.display = esBici && bicisGuardadas.length > 1 ? 'block' : 'none';
+  if (esBici && bicisGuardadas.length > 1) {
+    const grupoBici = document.getElementById('biciChipGroup');
+    grupoBici.innerHTML = bicisGuardadas.map(b => `<div class="chip" data-value="${b.id}">${b.nombre}</div>`).join('');
+    grupoBici.querySelectorAll('.chip').forEach(chip => chip.addEventListener('click', () => seleccionarChip('bici', chip.dataset.value)));
+    seleccionarChip('bici', biciDeSesion(s, bicisGuardadas) || '');
+  } else {
+    seleccionarChip('bici', '');
+  }
+
   document.getElementById('rpeRange').value = s.registro_manual.rpe || 5;
   document.getElementById('rpeValue').textContent = s.registro_manual.rpe || 5;
   document.getElementById('notaLibreInput').value = s.registro_manual.nota_libre || '';
@@ -16928,7 +17209,9 @@ document.getElementById('guardarRegistroBtn').addEventListener('click', () => {
       sensacion: valorChipSeleccionado('sensacion'),
       carga_articular: valorChipSeleccionado('carga_articular'),
       nota_libre: document.getElementById('notaLibreInput').value.trim(),
-      zapatilla_id: valorChipSeleccionado('zapatilla')
+      zapatilla_id: valorChipSeleccionado('zapatilla'),
+      // si no se eligió (una sola bici), se conserva la que tuviera
+      bici_id: valorChipSeleccionado('bici') || (loadSesionesMeta().find(x => x.id === sessionIdEnEdicion)?.registro_manual?.bici_id ?? null)
     },
     rodilla: {
       dolor_0_10: Number(document.getElementById('dolorRange').value),
