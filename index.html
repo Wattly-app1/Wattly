@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Wattly</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#14171F">
@@ -658,19 +658,76 @@
   .tend-delta.down{ color:var(--red); }
   .tend-pie{ font-size:11px; margin:2px 2px 0; opacity:.8; }
   #miniTendenciasWidget + .section-divider{ margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+  /* ---- Entrega 3: iconos SVG como máscara (se colorean con currentColor) ---- */
+  i[data-ic]{ display:inline-block; width:1.05em; height:1.05em; flex:none; vertical-align:-.16em; margin-right:.42em;
+    background-color:currentColor; -webkit-mask:var(--ic) center/contain no-repeat; mask:var(--ic) center/contain no-repeat; font-style:normal; }
+  h3 > i[data-ic], summary > i[data-ic]{ color:var(--teal); }
+  .del-btn i[data-ic]{ margin:0; width:14px; height:14px; vertical-align:middle; }
+  .sess-icon i[data-ic]{ width:17px; height:17px; vertical-align:-3px; margin-right:2px; color:var(--text-dim); }
+  .sensor-warn-tag i[data-ic], .tramo-tag i[data-ic]{ margin-right:.3em; }
+  i[data-ic=objetivo]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='10' cy='10' r='7.3'/%3E%3Ccircle cx='10' cy='10' r='4'/%3E%3Ccircle cx='10' cy='10' r='1.3' fill='black' stroke='none'/%3E%3C/svg%3E");}
+  i[data-ic=matraz]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.5 2.5h5M8.5 2.5v5L4.2 15.6A1.6 1.6 0 0 0 5.6 18h8.8a1.6 1.6 0 0 0 1.4-2.4L11.5 7.5v-5'/%3E%3Cpath d='M6.2 12.5h7.6'/%3E%3C/svg%3E");}
+  i[data-ic=balanza]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 3v13.5M6.5 17h7M3.5 5.5h13'/%3E%3Cpath d='M3.5 5.5L1.8 10.5a1.9 1.9 0 0 0 3.4 0z'/%3E%3Cpath d='M16.5 5.5l-1.7 5a1.9 1.9 0 0 0 3.4 0z'/%3E%3C/svg%3E");}
+  i[data-ic=montana]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1.5 16.5L7.3 6l3.6 6 2.4-3.2 5.2 7.7z'/%3E%3Cpath d='M5.6 9.1l1.7 1.1 1.6-1.2'/%3E%3C/svg%3E");}
+  i[data-ic=radar]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 2.5l6.5 3.75v7.5L10 17.5l-6.5-3.75v-7.5z'/%3E%3Cpath d='M10 6.2l3.3 2.2-.9 4.4-4.5-.4-1.3-3.9z' fill='black' fill-opacity='.35'/%3E%3C/svg%3E");}
+  i[data-ic=calendario]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='14' height='13' rx='2'/%3E%3Cpath d='M3 8h14M7 2.5v3M13 2.5v3'/%3E%3Ccircle cx='7' cy='11.5' r='.9' fill='black' stroke='none'/%3E%3Ccircle cx='10' cy='11.5' r='.9' fill='black' stroke='none'/%3E%3C/svg%3E");}
+  i[data-ic=lupa]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8.5' cy='8.5' r='5.5'/%3E%3Cpath d='M12.6 12.6l4.9 4.9'/%3E%3C/svg%3E");}
+  i[data-ic=zapatilla]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 14.2c0-3 1-5 3.2-5.7l2.8 1.6 3-1c2 2 4 2.6 6.4 3.1 1.1.3 1.1 3.3 0 3.3H2.9c-.5 0-.9-.6-.9-1.3z'/%3E%3Cpath d='M7 9.7l1-1.5M9.6 9.9l1-1.6M2.2 12.6h15.6'/%3E%3C/svg%3E");}
+  i[data-ic=trofeo]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3h8v4.5a4 4 0 0 1-8 0z'/%3E%3Cpath d='M6 4.8H3.5a2.6 2.6 0 0 0 2.8 3.4M14 4.8h2.5a2.6 2.6 0 0 1-2.8 3.4M10 11.5v3.5M6.8 17.5h6.4'/%3E%3C/svg%3E");}
+  i[data-ic=baja]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 5l5.5 5.5L11 7.5l7 6.5'/%3E%3Cpath d='M18 9.3V14h-4.7'/%3E%3C/svg%3E");}
+  i[data-ic=sube]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 15l5.5-5.5 3.5 3 7-6.5'/%3E%3Cpath d='M13.3 6H18v4.7'/%3E%3C/svg%3E");}
+  i[data-ic=barras]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 16.5V10M10 16.5V4M15.5 16.5V12.5M2.5 17.5h15'/%3E%3C/svg%3E");}
+  i[data-ic=mas]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 4v12M4 10h12'/%3E%3C/svg%3E");}
+  i[data-ic=bici]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='4.8' cy='13.3' r='3.3'/%3E%3Ccircle cx='15.2' cy='13.3' r='3.3'/%3E%3Cpath d='M4.8 13.3L7.9 7.5h5.2l2.1 5.8M7.9 7.5l2.7 5.8 2.5-5.8M6.8 5.3h2.4M12.3 5l1.8-.3'/%3E%3C/svg%3E");}
+  i[data-ic=corazon]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 16.6C4.3 12.7 2.5 10 2.5 7.4a3.7 3.7 0 0 1 7.5-1.6 3.7 3.7 0 0 1 7.5 1.6c0 2.6-1.8 5.3-7.5 9.2z'/%3E%3Cpath d='M5.2 9.6h2.3l1.2-2 1.7 4 1.2-2h3.2'/%3E%3C/svg%3E");}
+  i[data-ic=nube]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.6 15.5h8.9a3.4 3.4 0 0 0 .2-6.8 5 5 0 0 0-9.6 1.3 2.8 2.8 0 0 0 .5 5.5z'/%3E%3Cpath d='M7 18l.6-1M10.3 18l.6-1M13.6 18l.6-1'/%3E%3C/svg%3E");}
+  i[data-ic=llama]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 2.3c2.6 3.4 5.2 5 5.2 9.2a5.2 5.2 0 0 1-10.4 0c0-2.5 1.5-4.1 2.6-5.2.2 2 .9 3.2 2 3.5-.2-2.8 0-5.3.6-7.5z'/%3E%3C/svg%3E");}
+  i[data-ic=aviso]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 2.8l7.8 13.7H2.2z'/%3E%3Cpath d='M10 8.2v3.9'/%3E%3Ccircle cx='10' cy='14.3' r='.9' fill='black' stroke='none'/%3E%3C/svg%3E");}
+  i[data-ic=luna]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15.8 12.6A6.6 6.6 0 1 1 7.8 3.3a5.3 5.3 0 0 0 8 9.3z'/%3E%3Cpath d='M13 3h2.6L13 5.6h2.6'/%3E%3C/svg%3E");}
+  i[data-ic=repetir]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.6 9.2a6.5 6.5 0 0 1 11.6-3.1'/%3E%3Cpath d='M15.6 2.8v3.5h-3.5'/%3E%3Cpath d='M16.4 10.8a6.5 6.5 0 0 1-11.6 3.1'/%3E%3Cpath d='M4.4 17.2v-3.5h3.5'/%3E%3C/svg%3E");}
+  i[data-ic=pin]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 17.6c-3.9-4.8-5.5-7.4-5.5-10a5.5 5.5 0 0 1 11 0c0 2.6-1.6 5.2-5.5 10z'/%3E%3Ccircle cx='10' cy='7.6' r='2'/%3E%3C/svg%3E");}
+  i[data-ic=rodilla]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.2 2.5c1 2.6 2.4 5 3.7 7.1'/%3E%3Cpath d='M9.9 9.6c-.4 2.6-1.1 5-1.7 7.4h4.4'/%3E%3Ccircle cx='9.9' cy='9.6' r='1.9' fill='black' stroke='none'/%3E%3C/svg%3E");}
+  i[data-ic=pulmon]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 2.5v6.7M10 7.2L7.8 9.2M10 7.2l2.2 2'/%3E%3Cpath d='M7.6 5.8C5 5.8 3 9.3 3 13.2c0 2.3 1 3.8 2.6 3.8 1.5 0 2.4-1 2.4-2.9V7.6'/%3E%3Cpath d='M12.4 5.8c2.6 0 4.6 3.5 4.6 7.4 0 2.3-1 3.8-2.6 3.8-1.5 0-2.4-1-2.4-2.9V7.6'/%3E%3C/svg%3E");}
+  i[data-ic=bateria]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='6' width='13' height='8' rx='1.6'/%3E%3Cpath d='M17.5 8.5v3'/%3E%3Cpath d='M5.2 8.6v2.8M8 8.6v2.8M10.8 8.6v2.8'/%3E%3C/svg%3E");}
+  i[data-ic=casa]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.8 9.6L10 3.5l7.2 6.1'/%3E%3Cpath d='M4.8 8v8.5h10.4V8'/%3E%3Cpath d='M8.4 16.5v-4.3h3.2v4.3'/%3E%3C/svg%3E");}
+  i[data-ic=viento]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 7.5H12a2.4 2.4 0 1 0-2.4-2.4'/%3E%3Cpath d='M2.5 11h13a2.4 2.4 0 1 1-2.4 2.4'/%3E%3Cpath d='M2.5 14.5h5'/%3E%3C/svg%3E");}
+  i[data-ic=termometro]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 12.4V4.6a2 2 0 0 1 4 0v7.8a3.6 3.6 0 1 1-4 0z'/%3E%3Cpath d='M10 8v6'/%3E%3Ccircle cx='10' cy='14.9' r='1.3' fill='black' stroke='none'/%3E%3C/svg%3E");}
+  i[data-ic=proyeccion]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 15.5L6.5 11l3 1.5'/%3E%3Cpath d='M9.5 12.5l8-7.5' stroke-dasharray='1.6 2.2'/%3E%3Ccircle cx='9.5' cy='12.5' r='1.4' fill='black' stroke='none'/%3E%3C/svg%3E");}
+  i[data-ic=rayo]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11.2 2L4.5 11h5l-1 7 7-9.5h-5z'/%3E%3C/svg%3E");}
+  i[data-ic=pausa]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='10' cy='10' r='7.3'/%3E%3Cpath d='M8 6.8v6.4M12 6.8v6.4'/%3E%3C/svg%3E");}
+  i[data-ic=pieza]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h3.4a1.8 1.8 0 1 1 3.5 0h3.6v3.5a1.8 1.8 0 1 1 0 3.5v3.5H4z'/%3E%3C/svg%3E");}
+  i[data-ic=portapapeles]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4.5' y='4' width='11' height='13.5' rx='1.6'/%3E%3Cpath d='M7.5 2.7h5v2.6h-5z'/%3E%3Cpath d='M7.5 9.5h5M7.5 12.5h3.5'/%3E%3C/svg%3E");}
+  i[data-ic=espejo]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 2.5v15' stroke-dasharray='1.5 2'/%3E%3Cpath d='M7.5 5.2L3 14.2h4.5z'/%3E%3Cpath d='M12.5 5.2l4.5 9h-4.5z'/%3E%3C/svg%3E");}
+  i[data-ic=bandera]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 17.8V2.8'/%3E%3Cpath d='M4.5 3.4h11l-2.4 3.6 2.4 3.6h-11'/%3E%3C/svg%3E");}
+  i[data-ic=virtual]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='3.5' width='15' height='10' rx='1.6'/%3E%3Cpath d='M7 17h6M10 13.5V17'/%3E%3Cpath d='M8.6 6.4l3.9 2.1-3.9 2.1z'/%3E%3C/svg%3E");}
+  i[data-ic=crono]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='10' cy='11' r='6.5'/%3E%3Cpath d='M10 11l2.5-2.5M8 2.5h4M10 2.5v2'/%3E%3C/svg%3E");}
+  i[data-ic=destello]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 2l1.4 6.4L18 10l-6.6 1.6L10 18l-1.4-6.4L2 10l6.6-1.6z' fill='black' stroke='none'/%3E%3C/svg%3E");}
+  i[data-ic=pesa]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 10h9'/%3E%3Crect x='2.5' y='6.3' width='3' height='7.4' rx='.9'/%3E%3Crect x='14.5' y='6.3' width='3' height='7.4' rx='.9'/%3E%3Cpath d='M1.2 8.4v3.2M18.8 8.4v3.2'/%3E%3C/svg%3E");}
+  i[data-ic=intensidad]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 16.5v-3M7.2 16.5V11M10.9 16.5V8M14.6 16.5V4.5'/%3E%3C/svg%3E");}
+  i[data-ic=ondas]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 7.5h3l1.5-3 3 9 2.5-6 1.5 3H18'/%3E%3Cpath d='M2 15h16' stroke-dasharray='1.5 2.2'/%3E%3C/svg%3E");}
+  i[data-ic=hoy]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='10' cy='10' r='3.6'/%3E%3Cpath d='M10 1.8v2.2M10 16v2.2M1.8 10H4M16 10h2.2M4.2 4.2l1.6 1.6M14.2 14.2l1.6 1.6M4.2 15.8l1.6-1.6M14.2 5.8l1.6-1.6'/%3E%3C/svg%3E");}
+  i[data-ic=registro]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.5 5.5h9M7.5 10h9M7.5 14.5h9'/%3E%3Ccircle cx='4' cy='5.5' r='1' fill='black' stroke='none'/%3E%3Ccircle cx='4' cy='10' r='1' fill='black' stroke='none'/%3E%3Ccircle cx='4' cy='14.5' r='1' fill='black' stroke='none'/%3E%3C/svg%3E");}
+  i[data-ic=rutas]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='4.5' cy='15.5' r='2'/%3E%3Ccircle cx='15.5' cy='4.5' r='2'/%3E%3Cpath d='M6.3 14.6C11 13 6 9 10.5 7.4c1.4-.5 2.6-.9 3.3-1.6'/%3E%3C/svg%3E");}
+  i[data-ic=ajustes]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h8M15 6h2M3 14h2M9 14h8'/%3E%3Ccircle cx='13' cy='6' r='2'/%3E%3Ccircle cx='7' cy='14' r='2'/%3E%3C/svg%3E");}
+  /* ---- Entrega 3: navegación inferior ---- */
+  header{ padding-bottom:4px; }
+  header .eyebrow{ margin-bottom:12px; }
+  main{ padding-bottom:calc(84px + env(safe-area-inset-bottom)); }
+  .bottom-nav{ position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:460px; z-index:8;
+    display:flex; background:rgba(24,28,38,.96); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+    border-top:1px solid var(--line); padding:6px 6px calc(6px + env(safe-area-inset-bottom)); }
+  .bottom-nav .tab-btn{ flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 2px 4px;
+    border:none; border-radius:10px; font-size:11px; letter-spacing:0; color:var(--text-dim); }
+  .bottom-nav .tab-btn i[data-ic]{ width:22px; height:22px; margin:0; }
+  .bottom-nav .tab-btn.active{ color:var(--text); }
+  .bottom-nav .tab-btn.active i[data-ic]{ color:var(--teal); }
+  .bottom-nav .tab-btn:active{ background:var(--surface-2); }
 </style>
 </head>
 <body>
 <div class="device">
   <header>
     <div class="eyebrow"><span class="dot"></span> WATTLY · JAVI</div>
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="debrief">Hoy</button>
-      <button class="tab-btn" data-tab="registro">Registro</button>
-      <button class="tab-btn" data-tab="rutas">Rutas</button>
-      <button class="tab-btn" data-tab="estadisticas">Stats</button>
-      <button class="tab-btn" data-tab="ajustes">Ajustes</button>
-    </div>
     <svg class="header-river" viewBox="0 0 400 10" preserveAspectRatio="none" aria-hidden="true">
       <path d="M0,5 C40,1 80,9 120,4 C160,0 200,8 240,3 C280,0 320,7 360,3 C380,1 390,4 400,3" fill="none" stroke="#4C8C82" stroke-width="1.1"/>
       <path d="M0,7 C40,3 80,10 120,6 C160,2 200,9 240,5 C280,2 320,8 360,4 C380,2 390,6 400,5" fill="none" stroke="#D6A354" stroke-width="1.1" opacity=".65"/>
@@ -681,7 +738,7 @@
     <div class="tab-panel" id="panel-registro">
       <div id="recordsPersonalesWidget"></div>
       <div class="card">
-        <h3>➕ Añadir sesión</h3>
+        <h3><i data-ic=mas></i>Añadir sesión</h3>
         <div class="importar-opciones">
           <label class="importar-op" for="fileInput">
             <span class="importar-op-tit">⌚ Archivo .FIT</span>
@@ -733,7 +790,7 @@
         <div id="vamWidget"></div>
         <div id="balanceAerobicoWidget"></div>
         <details class="tool-details">
-          <summary>🔍 Comparador de sesiones gemelas <span class="beta-tag">beta</span></summary>
+          <summary><i data-ic=lupa></i>Comparador de sesiones gemelas <span class="beta-tag">beta</span></summary>
           <div id="comparadorWidget"></div>
         </details>
       </details>
@@ -762,7 +819,7 @@
         <div id="calorWidget"></div>
         <div id="correlacionesWidget"></div>
         <details class="tool-details">
-          <summary>⚡ Desacople cardíaco vs. dolor <span class="beta-tag">beta</span></summary>
+          <summary><i data-ic=rayo></i>Desacople cardíaco vs. dolor <span class="beta-tag">beta</span></summary>
           <div id="desacopleCorrWidget"></div>
         </details>
         <div id="zapatillasStatsWidget"></div>
@@ -772,13 +829,13 @@
         <summary><span class="dot"></span> Fiabilidad de Wattly</summary>
         <div id="calibracionWidget"></div>
         <details class="tool-details">
-          <summary>📊 Fiabilidad de tus señales <span class="beta-tag">beta</span></summary>
+          <summary><i data-ic=barras></i>Fiabilidad de tus señales <span class="beta-tag">beta</span></summary>
           <div id="fiabilidadWidget"></div>
         </details>
       </details>
 
       <button class="wrapped-abrir-btn" id="abrirWrappedBtn">
-        <span>✨ Wattly Wrapped</span>
+        <span><i data-ic=destello></i>Wattly Wrapped</span>
         <span class="hint">Resumen de un rango de fechas, tarjeta a tarjeta →</span>
       </button>
     </div>
@@ -794,7 +851,7 @@
       <div id="radarEstadoWidget"></div>
       <div id="construirFormaWidget"></div>
       <div class="card">
-        <h3>🎯 Carrera objetivo</h3>
+        <h3><i data-ic=objetivo></i>Carrera objetivo</h3>
         <div class="carrera-inputs">
           <input type="text" id="carreraNombreInput" placeholder="Nombre (ej. 10K de Madrid)">
           <input type="date" id="carreraFechaInput">
@@ -817,15 +874,15 @@
 
       <div class="section-divider"><span class="dot"></span> Herramientas</div>
       <details class="tool-details">
-        <summary>🧪 Simulador de sesión <span class="beta-tag">beta</span></summary>
+        <summary><i data-ic=matraz></i>Simulador de sesión <span class="beta-tag">beta</span></summary>
         <div id="simuladorWidget"></div>
       </details>
       <details class="tool-details">
-        <summary>🏖️ Simulador de parón <span class="beta-tag">beta</span></summary>
+        <summary><i data-ic=pausa></i>Simulador de parón <span class="beta-tag">beta</span></summary>
         <div id="paronWidget"></div>
       </details>
       <details class="tool-details">
-        <summary>🧩 Semana que funciona <span class="beta-tag">beta</span></summary>
+        <summary><i data-ic=pieza></i>Semana que funciona <span class="beta-tag">beta</span></summary>
         <div id="semanaQueFuncionaWidget"></div>
       </details>
 
@@ -871,7 +928,7 @@
 
     <div class="tab-panel" id="panel-ajustes">
       <div class="card">
-        <h3>API key de Anthropic</h3>
+        <h3><i data-ic=destello></i>API key de Anthropic</h3>
         <p class="hint" style="margin-bottom:10px;">Se guarda solo en este dispositivo (localStorage), igual que en tus otras apps. Nunca sale de aquí salvo hacia la propia API de Anthropic. Cualquiera con acceso físico a este móvil/navegador podría leerla desde las herramientas de desarrollador — no la guardes en un dispositivo compartido.</p>
         <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
         <div style="display:flex; gap:8px;">
@@ -882,7 +939,7 @@
       </div>
 
       <div class="card">
-        <h3>🚴 FTP configurado</h3>
+        <h3><i data-ic=bici></i>FTP configurado</h3>
         <p class="hint" style="margin-bottom:10px;">El de tu último test real (o el que uses en Rouvy/Intervals.icu). Se usa como referencia para comparar contra el FTP estimado por la curva de potencia en Estadísticas. Ojo: el TSS de bici no sale de aquí, lo calcula tu Garmin (o Rouvy) con el FTP que tenga configurado él — abajo ves si está al día.</p>
         <input type="number" id="ftpConfiguradoInput" placeholder="Ej. 215" min="0" step="1">
         <div style="display:flex; gap:8px;">
@@ -894,13 +951,13 @@
       </div>
 
       <div class="card">
-        <h3>❤️ Umbral de FC (zonas)</h3>
+        <h3><i data-ic=corazon></i>Umbral de FC (zonas)</h3>
         <p class="hint">Las zonas de FC salen de tu umbral: por defecto, tu mejor FC media de 20 min seguidos en los últimos 90 días, por separado en carrera y bici. Si en ese tiempo no has hecho ningún esfuerzo duro y largo, sale bajo: fíjalo a mano con el de tu último test.</p>
         <div id="umbralFcAjustes"></div>
       </div>
 
       <div class="card">
-        <h3>👟 Zapatillas</h3>
+        <h3><i data-ic=zapatilla></i>Zapatillas</h3>
         <p class="hint" style="margin-bottom:10px;">Kilometraje acumulado por zapatilla. Aviso al acercarse a 700 km, el umbral habitual de desgaste en asfalto.</p>
         <div class="zapatilla-inputs">
           <input type="text" id="zapatillaNombreInput" placeholder="Nombre (ej. Nike Pegasus 40)">
@@ -911,7 +968,7 @@
       </div>
 
       <div class="card">
-        <h3>⚖️ Pesos guardados</h3>
+        <h3><i data-ic=balanza></i>Pesos guardados</h3>
         <p class="hint" style="margin-bottom:10px;">Tu peso puede variar según la época de temporada — guarda varios y elige cuál usar al simular un puerto, en vez de un valor único fijo.</p>
         <div class="zapatilla-inputs">
           <input type="text" id="pesoEtiquetaInput" placeholder="Etiqueta (ej. Pretemporada, En forma)">
@@ -922,7 +979,7 @@
       </div>
 
       <div class="card">
-        <h3>🚲 Bicis guardadas</h3>
+        <h3><i data-ic=bici></i>Bicis guardadas</h3>
         <p class="hint" style="margin-bottom:10px;">Peso de cada bici, para las simulaciones de puerto (ruta → RUTAS).</p>
         <div class="zapatilla-inputs">
           <input type="text" id="biciNombreInput" placeholder="Nombre (ej. Canyon carretera)">
@@ -933,7 +990,7 @@
       </div>
 
       <div class="card">
-        <h3>Backup de datos</h3>
+        <h3><i data-ic=portapapeles></i>Backup de datos</h3>
         <p class="hint" style="margin-bottom:10px;">Todo vive en este móvil (localStorage + IndexedDB). Si borras datos, cambias de móvil o pasas a la versión PWA, lo pierdes. El backup guarda todo (sesiones, tracks, sueño, pesos, bicis, ajustes…) excepto la API key, que tendrás que volver a pegar.</p>
         <button class="primary-btn" id="exportBtn">⬇ Exportar backup</button>
         <label for="importInput" class="primary-btn" style="display:block; text-align:center; background:var(--surface-2); color:var(--text); border:1px solid var(--line); cursor:pointer;">⬆ Importar backup</label>
@@ -944,7 +1001,7 @@
         <button class="primary-btn" id="instalarAppBtn" style="display:none; margin-top:8px;">📲 Instalar Wattly en el móvil</button>
       </div>
       <div class="card">
-        <h3>🌦️ Tiempo real de las sesiones</h3>
+        <h3><i data-ic=nube></i>Tiempo real de las sesiones</h3>
         <p class="hint" style="margin-bottom:10px;">Las sesiones nuevas con GPS lo traen solas al importarlas. Este botón rellena las antiguas: temperatura, humedad, sensación térmica y viento de Open-Meteo. Solo se envía la fecha y una ubicación aproximada (~1 km).</p>
         <button class="primary-btn" id="completarMeteoBtn">Completar tiempo</button>
         <div id="completarMeteoStatus" class="status"></div>
@@ -957,10 +1014,19 @@
     </div>
   </main>
 
+  <!-- Navegación inferior: al alcance del pulgar en la app instalada -->
+  <nav class="bottom-nav" aria-label="Secciones">
+    <button class="tab-btn active" data-tab="debrief"><i data-ic=hoy></i><span>Hoy</span></button>
+    <button class="tab-btn" data-tab="registro"><i data-ic=registro></i><span>Registro</span></button>
+    <button class="tab-btn" data-tab="rutas"><i data-ic=rutas></i><span>Rutas</span></button>
+    <button class="tab-btn" data-tab="estadisticas"><i data-ic=barras></i><span>Stats</span></button>
+    <button class="tab-btn" data-tab="ajustes"><i data-ic=ajustes></i><span>Ajustes</span></button>
+  </nav>
+
   <div class="modal-overlay" id="mapaCalorModal">
     <div class="modal modal-mapa-calor">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-        <h3 style="margin-bottom:0;">🔥 Mapa de rendimiento</h3>
+        <h3 style="margin-bottom:0;"><i data-ic=llama></i>Mapa de rendimiento</h3>
         <button id="cerrarMapaCalorBtn" class="del-btn" style="width:auto; padding:4px 10px;">✕</button>
       </div>
       <p class="hint" id="mapaCalorModalSubtitulo"></p>
@@ -987,7 +1053,7 @@
 
   <div class="modal-overlay" id="importModal">
     <div class="modal">
-      <h3>⚠️ Restaurar backup</h3>
+      <h3><i data-ic=aviso></i>Restaurar backup</h3>
       <p>Esto sustituirá TODOS los datos actuales por los del fichero importado (sesiones, tracks, sueño, ajustes…). La API key no se toca. No se puede deshacer. ¿Continuar?</p>
       <div class="modal-actions">
         <button id="cancelImportBtn">Cancelar</button>
@@ -1048,7 +1114,7 @@
 
       <input type="text" id="notaLibreInput" placeholder="Nota libre (ej: series pesadas, buen día)">
 
-      <div class="modal-section-title">🦵 Rodilla</div>
+      <div class="modal-section-title"><i data-ic=rodilla></i>Rodilla</div>
 
       <span class="field-label">Dolor (0-10)</span>
       <div class="range-row">
@@ -1392,7 +1458,7 @@ function renderSuenoWidget() {
 
   el.innerHTML = `
     <div class="card">
-      <h3>😴 Sueño</h3>
+      <h3><i data-ic=luna></i>Sueño</h3>
       <p class="hint">Sin exportación disponible desde Suunto — se registra a mano, un dato por noche.</p>
       <div class="sueno-inputs" style="margin-top:8px;">
         <input type="date" id="suenoFechaInput">
@@ -1403,7 +1469,7 @@ function renderSuenoWidget() {
       <button class="primary-btn" id="guardarSuenoBtn" style="margin-top:8px;">Guardar</button>
       <div id="suenoStatus" class="status"></div>
       <details class="tool-details">
-        <summary>📋 Historial de sueño</summary>
+        <summary><i data-ic=portapapeles></i>Historial de sueño</summary>
         <div id="suenoHistorial"></div>
       </details>
     </div>
@@ -2118,7 +2184,7 @@ function renderAnalisisGpx() {
 
   el.innerHTML = `
     <div class="card">
-      <h3>🏔️ Analiza un puerto/etapa <span class="beta-tag">beta</span></h3>
+      <h3><i data-ic=montana></i>Analiza un puerto/etapa <span class="beta-tag">beta</span></h3>
       <p class="hint">Sube un GPX de una ruta — perfil de elevación, detección de puertos, y estimación de tiempo por puerto cruzando tu curva de potencia, tu durability real y la fatiga acumulada de los km previos de la propia ruta. Guarda la ruta para volver a analizarla más adelante, sin resubir el archivo, y ver cómo cambia la estimación con tu forma física del momento.</p>
       <input type="file" id="gpxFileInput" accept=".gpx" style="margin-top:8px;">
       <div id="gpxStatus" class="status"></div>
@@ -2257,7 +2323,7 @@ function renderAnalisisGpx() {
                 : 'extrapolación considerable de tu curva de potencia — tómalo con mucha cautela';
               resultadoEl.innerHTML = `
                 <div class="desacople-card forma-card ${claseConfianza}">
-                  <span class="desacople-label">⏱️ Tiempo estimado (confianza ${r.confianza})</span>
+                  <span class="desacople-label"><i data-ic=crono></i>Tiempo estimado (confianza ${r.confianza})</span>
                   <span class="desacople-valor">${formatoDuracionHhMm(duracionMostrada)}</span>
                   <span class="hint">${r.potenciaEstimadaW}W · ${r.velocidadKmh} km/h media · ${textoConfianza}</span>
                 </div>
@@ -5855,7 +5921,7 @@ function renderAcwrRendimientoWidget() {
   }
   el.innerHTML = `
     <div class="card">
-      <h3>🎯 Zona de progreso (ACWR de rendimiento)</h3>
+      <h3><i data-ic=objetivo></i>Zona de progreso (ACWR de rendimiento)</h3>
       <p class="hint">¿En qué rango de carga (ACWR) has estado justo antes de tus sesiones más eficientes? No es un umbral de seguridad — es un patrón de TU histórico, no una garantía de repetir el resultado.</p>
       <div class="stats-period" style="margin-top:8px;">
         ${disciplinasDisponibles.map((d, i) => `<button class="stats-period-btn acwr-rend-disc-btn ${i === 0 ? 'active' : ''}" data-disc="${d}">${d === 'running' ? '🏃 Running' : '🚴 Bici'}</button>`).join('')}
@@ -6383,7 +6449,7 @@ async function renderRadarEstadoWidget() {
     el.innerHTML = '';
     return;
   }
-  el.innerHTML = `<div class="card"><h3>🕸️ Radar de estado <span class="beta-tag">beta</span></h3><p class="hint">Calculando…</p></div>`;
+  el.innerHTML = `<div class="card"><h3><i data-ic=radar></i>Radar de estado <span class="beta-tag">beta</span></h3><p class="hint">Calculando…</p></div>`;
   try {
     const datos = await calcularRadarEstado(sesiones);
     if (!datos) { el.innerHTML = ''; return; }
@@ -6397,7 +6463,7 @@ async function renderRadarEstadoWidget() {
     el.innerHTML = `
       <div class="card">
         <div class="card-h3-row">
-          <h3>🕸️ Radar de estado <span class="beta-tag">beta</span></h3>
+          <h3><i data-ic=radar></i>Radar de estado <span class="beta-tag">beta</span></h3>
           <button class="info-toggle" type="button" aria-label="Cómo leer este radar">?</button>
         </div>
         <p class="hint info-collapse" hidden>Cuanto más se acerque un pico al borde, más atípico es ese valor frente a tu propio historial — no un umbral externo. TSB/ACWR son de hoy; el resto, de tu última carrera con ese dato (fecha indicada si no es de hoy).</p>
@@ -6413,7 +6479,7 @@ async function renderRadarEstadoWidget() {
     });
   } catch (err) {
     console.error(err);
-    el.innerHTML = `<div class="card"><h3>🕸️ Radar de estado</h3><p class="hint" style="color:var(--red);">Error calculando el radar: ${err.message}</p></div>`;
+    el.innerHTML = `<div class="card"><h3><i data-ic=radar></i>Radar de estado</h3><p class="hint" style="color:var(--red);">Error calculando el radar: ${err.message}</p></div>`;
   }
 }
 
@@ -7337,7 +7403,7 @@ function renderTechoSesionWidget() {
   const minMin = DURABILITY_MIN_MINUTOS[techoSesionDisciplinaActual];
   el.innerHTML = `
     <div class="card">
-      <h3>🏔️ Techo de sesión <span class="beta-tag">beta</span></h3>
+      <h3><i data-ic=montana></i>Techo de sesión <span class="beta-tag">beta</span></h3>
       <p class="hint">En qué minuto empieza a romperse tu ritmo/potencia de forma sostenida en tus sesiones largas — complementa a Durability, que mide cuánto cae, no cuándo. Solo con sesiones ${lbl.nombrePlural} de ${minMin}+ min; en running el ritmo se corrige por pendiente para que una cuesta no cuente como ruptura falsa.</p>
       <div class="stats-period">
         <button class="stats-period-btn ${techoSesionDisciplinaActual === 'cycling' ? 'active' : ''}" data-disciplina="cycling">🚴 Bici</button>
@@ -7607,7 +7673,7 @@ function renderDetectorSeriesWidget() {
 
   el.innerHTML = `
     <div class="card">
-      <h3>🔁 Detector de series <span class="beta-tag">beta</span></h3>
+      <h3><i data-ic=repetir></i>Detector de series <span class="beta-tag">beta</span></h3>
       <p class="hint">Busca repeticiones estructuradas (series, intervalos, fartlek con duración constante) dentro de una sesión, a partir de bloques de esfuerzo alto/bajo con duración uniforme. No detecta fartlek libre ni progresiones — solo patrones que se repiten con regularidad.</p>
       <div class="simulador-inputs" style="margin-top:8px;">
         <select id="detectorSeriesSesionInput">${opciones}</select>
@@ -8953,7 +9019,7 @@ function renderResumenSemanal() {
 
   el.innerHTML = `
     <div class="card resumen-semanal-card">
-      <h3>📆 Esta semana</h3>
+      <h3><i data-ic=calendario></i>Esta semana</h3>
       <div class="pmc-grid">
         <div><span class="label">TSS (7d)</span><span class="val">${r.tssEstaSemana}</span>${tendenciaTss ? ` <span class="hint">vs. semana anterior ${tendenciaTss}</span>` : ''}</div>
         <div><span class="label">Sesiones</span><span class="val">${r.nSesionesSemana}</span></div>
@@ -9063,7 +9129,7 @@ function renderRecordsPersonales() {
 
   el.innerHTML = `
     <div class="card" style="border-color:var(--teal);">
-      <h3>🏆 Nueva mejor marca personal</h3>
+      <h3><i data-ic=trofeo></i>Nueva mejor marca personal</h3>
       ${nuevos.map(r => `
         <div class="record-item">
           <span class="record-label">${r.emoji} ${r.label}</span>
@@ -9705,7 +9771,7 @@ function renderModeloRiesgo() {
   if (!el) return;
   const sesiones = loadSesionesMeta();
   if (_cacheModeloRiesgo.clave !== _claveModeloRiesgo(sesiones)) {
-    if (!el.innerHTML) el.innerHTML = `<div class="card"><h3>🧪 Modelo de riesgo <span class="beta-tag">beta</span></h3><p class="hint">Calculando con tu historial…</p></div>`;
+    if (!el.innerHTML) el.innerHTML = `<div class="card"><h3><i data-ic=matraz></i>Modelo de riesgo <span class="beta-tag">beta</span></h3><p class="hint">Calculando con tu historial…</p></div>`;
     clearTimeout(_temporizadorModeloRiesgo);
     _temporizadorModeloRiesgo = setTimeout(_renderModeloRiesgoAhora, 60);
     return;
@@ -9720,7 +9786,7 @@ function _renderModeloRiesgoAhora() {
   if (!resultado.disponible) {
     el.innerHTML = `
       <div class="card">
-        <h3>🧪 Modelo de riesgo <span class="beta-tag">beta</span></h3>
+        <h3><i data-ic=matraz></i>Modelo de riesgo <span class="beta-tag">beta</span></h3>
         ${estadoVacioHtml(resultado.motivo)}
       </div>`;
     return;
@@ -9732,7 +9798,7 @@ function _renderModeloRiesgoAhora() {
 
   el.innerHTML = `
     <div class="card">
-      <h3>🧪 Modelo de riesgo <span class="beta-tag">beta</span></h3>
+      <h3><i data-ic=matraz></i>Modelo de riesgo <span class="beta-tag">beta</span></h3>
       <p class="hint" style="margin-bottom:10px;">Entrenado con tus ${resultado.n} sesiones registradas — no son reglas que puse yo, es el patrón que sacan tus propios datos.</p>
       ${resultado.probabilidades.map(p => `
         <div class="riesgo-fila">
@@ -9753,7 +9819,7 @@ function renderEstancamientoWidget() {
   const sesiones = loadSesionesMeta();
   calcularEstancamiento(sesiones).then(r => {
     if (!r.disponible) {
-      el.innerHTML = `<div class="card"><h3>📉 Estancamiento <span class="beta-tag">beta</span></h3>${estadoVacioHtml(r.motivo)}</div>`;
+      el.innerHTML = `<div class="card"><h3><i data-ic=baja></i>Estancamiento <span class="beta-tag">beta</span></h3>${estadoVacioHtml(r.motivo)}</div>`;
       return;
     }
     const filasHtml = r.indicadores.map(i => {
@@ -9763,7 +9829,7 @@ function renderEstancamientoWidget() {
     const claseCtl = r.ctlDeltaPct == null ? '' : r.ctlDeltaPct > 0 ? 'up' : 'down';
     el.innerHTML = `
       <div class="card">
-        <h3>📉 Estancamiento <span class="beta-tag">beta</span></h3>
+        <h3><i data-ic=baja></i>Estancamiento <span class="beta-tag">beta</span></h3>
         <p class="hint">Cruza tu carga de entrenamiento (CTL) con la tendencia de tus indicadores de rendimiento — distinto de "estás cansado" (eso ya lo cubre el semáforo/TSB), esto es "entrenas más pero no mejoras".</p>
         <div class="pmc-grid" style="margin-top:8px;">
           <div><span class="label">CTL (carga)</span><span class="val ${claseCtl}">${r.ctlDeltaPct != null ? (r.ctlDeltaPct > 0 ? '+' : '') + r.ctlDeltaPct + '%' : '—'}</span></div>
@@ -9785,7 +9851,7 @@ function renderCorrelaciones() {
   if (sesiones.length < MIN_SESIONES_TOTAL) {
     el.innerHTML = `
       <div class="card">
-        <h3>🔍 Patrones en tus datos</h3>
+        <h3><i data-ic=lupa></i>Patrones en tus datos</h3>
         ${estadoVacioHtml(`Necesitas al menos ${MIN_SESIONES_TOTAL} sesiones registradas para que esto tenga base estadística. De momento tienes ${sesiones.length}.`)}
       </div>`;
     return;
@@ -9795,7 +9861,7 @@ function renderCorrelaciones() {
   if (!correlaciones.length) {
     el.innerHTML = `
       <div class="card">
-        <h3>🔍 Patrones en tus datos</h3>
+        <h3><i data-ic=lupa></i>Patrones en tus datos</h3>
         <p class="hint">Con tu historial actual no hay diferencias lo bastante claras como para señalar un patrón fiable todavía.</p>
       </div>`;
     return;
@@ -9803,7 +9869,7 @@ function renderCorrelaciones() {
 
   el.innerHTML = `
     <div class="card">
-      <h3>🔍 Patrones en tus datos</h3>
+      <h3><i data-ic=lupa></i>Patrones en tus datos</h3>
       <p class="hint" style="margin-bottom:10px;">Cálculo directo sobre tu historial, sin IA de por medio.</p>
       ${correlaciones.map(c => `
         <div class="corr-item">
@@ -10395,6 +10461,11 @@ async function llamarClaude(apiKey, userMsg) {
 // tiempo de ejecución, nunca al cargar.
 // ============================================================
 
+// Icono SVG (máscara CSS, ver i[data-ic]) para la disciplina de una sesión
+function iconoDisciplinaSvg(tipo) {
+  return { running: 'zapatilla', cycling: 'bici', gym: 'pesa' }[categoriaDisciplina(tipo)] || 'rayo';
+}
+
 // ---------- Zonas de FC y potencia ----------
 // Por sesión se guarda un HISTOGRAMA (segundos por ppm y por tramo de 10 W),
 // no los minutos por zona: así, si tu umbral cambia, todo el historial se
@@ -10711,7 +10782,7 @@ function renderPolarizacionWidget() {
   if (r.sinUmbral) avisos.push(`${r.sinUmbral} ${r.sinUmbral === 1 ? 'sesión no cuenta' : 'sesiones no cuentan'} porque su disciplina no tiene umbral todavía`);
   if (r.sinPulso) avisos.push(`${r.sinPulso} sin pulso`);
   el.innerHTML = `<div class="card">
-      <h3>Reparto de intensidad</h3>
+      <h3><i data-ic=intensidad></i>Reparto de intensidad</h3>
       <p class="hint">Minutos por bloque de FC en carrera y bici, semana a semana. Se calcula con tu umbral actual: carrera ${txtUmbral('running')} · bici ${txtUmbral('cycling')}.</p>
       ${cuerpo}
       ${avisos.length ? `<p class="hint" style="margin-top:6px; opacity:.8;">${avisos.join(' · ')}.</p>` : ''}
@@ -11223,10 +11294,10 @@ function renderMonotoniaWidget() {
   const el = document.getElementById('monotoniaWidget');
   if (!el) return;
   const r = calcularMonotoniaStrain(loadSesionesMeta());
-  if (!r.disponible) { el.innerHTML = `<div class="card"><h3>Monotonía y strain</h3>${estadoVacioHtml(r.motivo)}</div>`; return; }
+  if (!r.disponible) { el.innerHTML = `<div class="card"><h3><i data-ic=ondas></i>Monotonía y strain</h3>${estadoVacioHtml(r.motivo)}</div>`; return; }
   const a = r.actual;
   el.innerHTML = `<div class="card">
-      <h3>Monotonía y strain</h3>
+      <h3><i data-ic=ondas></i>Monotonía y strain</h3>
       <p class="hint">Monotonía: lo parecidos que son tus días de carga en una semana (sube si no hay días fáciles ni de descanso). Strain: TSS de la semana × monotonía. Una semana cargada <i>y</i> monótona es la que más castiga.</p>
       <div class="polar-resumen" style="grid-template-columns:repeat(3,1fr);">
         <div><span class="polar-num">${a.suma}</span><span class="hint">TSS 7 días</span></div>
@@ -11395,6 +11466,8 @@ function nombreTipo(tipo) {
 }
 
 function cambiarTab(tab) {
+  const cambia = !document.querySelector(`.tab-btn.active[data-tab="${tab}"]`);
+  if (cambia) window.scrollTo(0, 0); // cada pestaña empieza arriba
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
 }
@@ -11852,19 +11925,19 @@ function renderSesiones() {
     <div class="sess-card ${epocAlto ? 'sess-epoc-alto' : ''}" data-id="${s.id}">
       <div class="sess-top">
         <div>
-          <span class="sess-icon">${iconoTipo(s.tipo)}</span>
+          <span class="sess-icon"><i data-ic=${iconoDisciplinaSvg(s.tipo)}></i></span>
           <strong>${nombreTipo(s.tipo)}</strong>
           <span class="hint"> · ${s.fecha} ${s.hora}</span>
-          ${epocAlto ? `<span class="sensor-warn-tag" title="EPOC ${s.datos_suunto.epoc} — al menos ${EPOC_UMBRAL_MULTIPLICADOR}x tu media reciente (${Math.round(epocMediaGlobal)}, últimos ${VENTANA_ESTIMACION_DIAS} días o todo tu histórico si no hay suficientes). Esfuerzo metabólicamente muy exigente.">🔥 EPOC alto</span>` : ''}
-          ${s.sensor_potencia_ausente ? `<span class="sensor-warn-tag" title="Ningún registro trajo potencia > 0 — probablemente el potenciómetro no estaba emparejado esta sesión">⚠️ Sin potencia</span>` : ''}
-          ${!s.sensor_potencia_ausente && s.sensor_cadencia_ausente ? `<span class="sensor-warn-tag" title="Ningún registro trajo cadencia > 0 — probablemente el sensor de cadencia no estaba emparejado esta sesión">⚠️ Sin cadencia</span>` : ''}
-          ${esCarreraOTest(s) ? `<span class="sensor-warn-tag carrera-tag" title="Carrera o test: cuenta para tu TSB óptimo${s.es_carrera == null ? ' (marcada automáticamente por RPE ≥ ' + TSBOPT_RPE_AUTO + '; cámbialo con ✎)' : ''}">🏁 Carrera</span>` : ''}
-          ${s.es_virtual ? `<span class="sensor-warn-tag" title="Sesión de Rouvy en rodillo: la ruta es virtual (sin mapa, sin tiempo, sin tramos). Distancia, desnivel, potencia, FC y cadencia cuentan en tus estadísticas.">🏠 Rouvy</span>` : ''}
-          ${s.es_interior && !s.es_virtual ? `<span class="sensor-warn-tag" title="Sin coordenadas GPS — sesión de interior (rodillo/cinta). Potencia/FC/cadencia se usan igual en curva de potencia, durability y espejo.">🏠 Interior</span>` : ''}
+          ${epocAlto ? `<span class="sensor-warn-tag" title="EPOC ${s.datos_suunto.epoc} — al menos ${EPOC_UMBRAL_MULTIPLICADOR}x tu media reciente (${Math.round(epocMediaGlobal)}, últimos ${VENTANA_ESTIMACION_DIAS} días o todo tu histórico si no hay suficientes). Esfuerzo metabólicamente muy exigente."><i data-ic=llama></i>EPOC alto</span>` : ''}
+          ${s.sensor_potencia_ausente ? `<span class="sensor-warn-tag" title="Ningún registro trajo potencia > 0 — probablemente el potenciómetro no estaba emparejado esta sesión"><i data-ic=aviso></i>Sin potencia</span>` : ''}
+          ${!s.sensor_potencia_ausente && s.sensor_cadencia_ausente ? `<span class="sensor-warn-tag" title="Ningún registro trajo cadencia > 0 — probablemente el sensor de cadencia no estaba emparejado esta sesión"><i data-ic=aviso></i>Sin cadencia</span>` : ''}
+          ${esCarreraOTest(s) ? `<span class="sensor-warn-tag carrera-tag" title="Carrera o test: cuenta para tu TSB óptimo${s.es_carrera == null ? ' (marcada automáticamente por RPE ≥ ' + TSBOPT_RPE_AUTO + '; cámbialo con ✎)' : ''}"><i data-ic=bandera></i>Carrera</span>` : ''}
+          ${s.es_virtual ? `<span class="sensor-warn-tag" title="Sesión de Rouvy en rodillo: la ruta es virtual (sin mapa, sin tiempo, sin tramos). Distancia, desnivel, potencia, FC y cadencia cuentan en tus estadísticas."><i data-ic=casa></i>Rouvy</span>` : ''}
+          ${s.es_interior && !s.es_virtual ? `<span class="sensor-warn-tag" title="Sin coordenadas GPS — sesión de interior (rodillo/cinta). Potencia/FC/cadencia se usan igual en curva de potencia, durability y espejo."><i data-ic=casa></i>Interior</span>` : ''}
         </div>
         <div style="display:flex; gap:6px;">
-          ${categoriaDisciplina(s.tipo) === 'running' ? `<button class="del-btn balance-btn" data-id="${s.id}" title="Importar balance de apoyo desde JSON de Suunto">⚖️</button>` : ''}
-          ${s.datos_suunto.epoc == null ? `<button class="del-btn epoc-btn" data-id="${s.id}" title="Importar EPOC desde JSON de Suunto (útil sobre todo en bici/gym, donde el .fit no siempre lo trae)">🔋</button>` : ''}
+          ${categoriaDisciplina(s.tipo) === 'running' ? `<button class="del-btn balance-btn" data-id="${s.id}" title="Importar balance de apoyo desde JSON de Suunto"><i data-ic=balanza></i></button>` : ''}
+          ${s.datos_suunto.epoc == null ? `<button class="del-btn epoc-btn" data-id="${s.id}" title="Importar EPOC desde JSON de Suunto (útil sobre todo en bici/gym, donde el .fit no siempre lo trae)"><i data-ic=bateria></i></button>` : ''}
           <button class="del-btn edit-btn" data-id="${s.id}" title="Editar registro">✎</button>
           <button class="del-btn del-x" data-id="${s.id}">✕</button>
         </div>
@@ -11883,9 +11956,9 @@ function renderSesiones() {
           : ''}
       </div>
       ${lineaMeteoHtml(s)}
-      ${s.es_virtual && s.ruta_virtual ? `<div class="tramo-tag">🎮 ${s.ruta_virtual}</div>` : ''}
-      ${s.prueba_fija ? `<div class="tramo-tag">🧪 Prueba fija ${s.prueba_fija.vatios_objetivo} W · FC ${s.prueba_fija.fc_media} · deriva ${s.prueba_fija.deriva_ppm != null ? (s.prueba_fija.deriva_ppm > 0 ? '+' : '') + s.prueba_fija.deriva_ppm : '—'} ppm</div>` : ''}
-      ${s.tramo_id ? `<div class="tramo-tag">📍 ${(loadTramos().find(t => t.id === s.tramo_id) || {}).nombre || 'tramo'}</div>` : ''}
+      ${s.es_virtual && s.ruta_virtual ? `<div class="tramo-tag"><i data-ic=virtual></i>${s.ruta_virtual}</div>` : ''}
+      ${s.prueba_fija ? `<div class="tramo-tag"><i data-ic=matraz></i>Prueba fija ${s.prueba_fija.vatios_objetivo} W · FC ${s.prueba_fija.fc_media} · deriva ${s.prueba_fija.deriva_ppm != null ? (s.prueba_fija.deriva_ppm > 0 ? '+' : '') + s.prueba_fija.deriva_ppm : '—'} ppm</div>` : ''}
+      ${s.tramo_id ? `<div class="tramo-tag"><i data-ic=pin></i>${(loadTramos().find(t => t.id === s.tramo_id) || {}).nombre || 'tramo'}</div>` : ''}
       ${tieneRegistro
         ? `<div class="registro-tag">${sensacionIcono} ${rm.zona_trabajada || ''} ${rm.rpe != null ? '· RPE ' + rm.rpe : ''}${rm.carga_articular ? ' · 🦴 ' + rm.carga_articular : ''}${rod.dolor_0_10 ? ' · 🦵 ' + rod.dolor_0_10 + '/10' : ''}</div>`
         : `<div class="registro-tag pendiente">Sin registro manual — toca ✎ para añadirlo</div>`}
@@ -11969,7 +12042,7 @@ function renderSesiones() {
               avisoCalor = `<p class="hint" style="margin-top:6px;">🌡️ ${temp}°C ${fuenteTxt}${origenUmbral} — algo de calor; puede estar inflando ligeramente este número.</p>`;
             }
             desacopleEl.innerHTML = `<div class="desacople-card ${claseDesacople(d.desacople_pct)}">
-                 <span class="desacople-label">⚡ Desacople cardíaco (potencia/FC)</span>
+                 <span class="desacople-label"><i data-ic=rayo></i>Desacople cardíaco (potencia/FC)</span>
                  <span class="desacople-valor">${d.desacople_pct > 0 ? '+' : ''}${d.desacople_pct}%</span>
                  <span class="hint">1ª mitad: ${d.pw1}W / ${d.hr1}ppm · 2ª mitad: ${d.pw2}W / ${d.hr2}ppm (${d.duracion_min} min)</span>
                </div>${avisoCalor}`;
@@ -11984,14 +12057,14 @@ function renderSesiones() {
             formaEl.innerHTML = `<p class="hint">🦵 ${f.motivo}</p>`;
           } else if (!f.rupturaDetectada) {
             formaEl.innerHTML = `<div class="desacople-card forma-card up">
-                 <span class="desacople-label">🦵 Ruptura de forma</span>
+                 <span class="desacople-label"><i data-ic=rodilla></i>Ruptura de forma</span>
                  <span class="desacople-valor">Estable</span>
                  <span class="hint">Cadencia y oscilación vertical se mantuvieron dentro de tu línea base los ${f.duracionMin} min de la sesión.</span>
                </div>`;
           } else {
             const clase = f.pctSesion >= 70 ? 'up' : f.pctSesion >= 40 ? 'warn' : 'down';
             formaEl.innerHTML = `<div class="desacople-card forma-card ${clase}">
-                 <span class="desacople-label">🦵 Ruptura de forma</span>
+                 <span class="desacople-label"><i data-ic=rodilla></i>Ruptura de forma</span>
                  <span class="desacople-valor">min ${f.minutoRuptura} <span style="font-size:12px; color:var(--text-dim);">(${f.pctSesion}% de la sesión)</span></span>
                  <span class="hint">Cadencia ${f.cadenciaBaseline}→${f.cadenciaEnRuptura} rpm · oscilación vertical ${f.oscilacionBaseline}→${f.oscilacionEnRuptura} mm, con FC estable (${f.hrDeltaPct >= 0 ? '+' : ''}${(f.hrDeltaPct * 100).toFixed(0)}%). Señal exploratoria — cotéjala con cómo te sentiste, no es un diagnóstico.</span>
                </div>`;
@@ -12194,7 +12267,7 @@ async function renderTramos() {
 
     return `
       <div class="card">
-        <h3>📍 ${tramo.nombre}</h3>
+        <h3><i data-ic=pin></i>${tramo.nombre}</h3>
         <p class="hint">${sesionesDelTramo.length} salida(s) · ${(tramo.distanciaTotal / 1000).toFixed(1)} km</p>
         <div class="mini-mapa-wrap" id="mapa-${tramo.id}">${tramo.huella ? generarMiniMapaSvg(tramo.huella, { alto: 100 }) : ''}</div>
         ${sesionesDelTramo.length >= MAPA_CALOR_MIN_SALIDAS ? `<button class="primary-btn tramo-calor-btn" data-tramo-id="${tramo.id}" style="margin-top:8px; width:auto;">🔥 Ver mapa de rendimiento</button><p class="hint tramo-calor-estado" data-tramo-id="${tramo.id}" style="margin-top:4px;"></p>` : ''}
@@ -12949,7 +13022,7 @@ function renderVamWidget() {
   if (!r.disponible) {
     el.innerHTML = `
       <div class="card">
-        <h3>⛰️ VAM histórica <span class="beta-tag">beta</span></h3>
+        <h3><i data-ic=montana></i>VAM histórica <span class="beta-tag">beta</span></h3>
         ${estadoVacioHtml(r.motivo)}
       </div>
     `;
@@ -12961,7 +13034,7 @@ function renderVamWidget() {
 
   el.innerHTML = `
     <div class="card">
-      <h3>⛰️ VAM histórica <span class="beta-tag">beta</span></h3>
+      <h3><i data-ic=montana></i>VAM histórica <span class="beta-tag">beta</span></h3>
       <p class="hint">Metros de ascenso por hora en tus sesiones de bici con desnivel real (≥${VAM_ASCENSO_MIN_M}m) — solo disponible en sesiones grabadas con Garmin.</p>
       <div class="pmc-grid" style="margin-top:8px;">
         <div><span class="label">Mejor VAM</span><span class="val up">${r.mejorVam} m/h</span></div>
@@ -12984,7 +13057,7 @@ function renderBalanceAerobicoWidget() {
   if (!r.disponible) {
     el.innerHTML = `
       <div class="card">
-        <h3>⚖️ Balance aeróbico/anaeróbico <span class="beta-tag">beta</span></h3>
+        <h3><i data-ic=balanza></i>Balance aeróbico/anaeróbico <span class="beta-tag">beta</span></h3>
         ${estadoVacioHtml(r.motivo)}
       </div>
     `;
@@ -12997,7 +13070,7 @@ function renderBalanceAerobicoWidget() {
 
   el.innerHTML = `
     <div class="card">
-      <h3>⚖️ Balance aeróbico/anaeróbico <span class="beta-tag">beta</span></h3>
+      <h3><i data-ic=balanza></i>Balance aeróbico/anaeróbico <span class="beta-tag">beta</span></h3>
       <p class="hint">Qué fracción de tu efecto de entrenamiento (PTE) es aeróbico vs. anaeróbico, según la propia clasificación de Garmin — solo disponible en sesiones grabadas con Garmin (Suunto no separa los dos).</p>
       <div class="pmc-grid" style="margin-top:8px;">
         <div><span class="label">Fracción aeróbica reciente</span><span class="val ${claseDelta}">${r.fraccionReciente}%${deltaPct != null ? ` (${deltaPct > 0 ? '+' : ''}${deltaPct}pp)` : ''}</span></div>
@@ -13221,7 +13294,7 @@ function generarHtmlRecordsHero(records) {
   ].map(c => ({ ...c, record: records[c.key] })).filter(c => c.record);
 
   if (!candidatos.length) {
-    return `<div class="card"><h3>🏆 Récords personales</h3>${estadoVacioHtml('Registra más sesiones para ver récords.')}</div>`;
+    return `<div class="card"><h3><i data-ic=trofeo></i>Récords personales</h3>${estadoVacioHtml('Registra más sesiones para ver récords.')}</div>`;
   }
 
   const hero = candidatos.slice().sort((a, b) => b.record.sesion.fecha.localeCompare(a.record.sesion.fecha))[0];
@@ -13966,17 +14039,17 @@ function renderEstadisticas() {
   document.getElementById('recordsStatsWidget').innerHTML = generarHtmlRecordsHero(records);
   document.getElementById('zapatillasStatsWidget').innerHTML = `
     <div class="card">
-      <h3>👟 Zapatillas activas</h3>
+      <h3><i data-ic=zapatilla></i>Zapatillas activas</h3>
       ${zapatillasHtml}
     </div>`;
   document.getElementById('dolorRodillaStatsWidget').innerHTML = dolorSvg ? `
     <div class="card">
-      <h3>🦵 Evolución dolor de rodilla</h3>
+      <h3><i data-ic=rodilla></i>Evolución dolor de rodilla</h3>
       ${dolorSvg}
     </div>` : '';
   document.getElementById('vo2maxTendenciaWidget').innerHTML = vo2maxSvg ? `
     <div class="card">
-      <h3>🫁 Tendencia VO2max estimado</h3>
+      <h3><i data-ic=pulmon></i>Tendencia VO2max estimado</h3>
       ${vo2maxSvg}
     </div>` : '';
 
@@ -13993,7 +14066,7 @@ function renderVistaUnificadaWidget() {
   const sesiones = loadSesionesMeta();
   calcularVistaUnificada(sesiones).then(r => {
     if (!r.disponible) {
-      el.innerHTML = `<div class="card"><h3>📊 Evolución de tu forma <span class="beta-tag">beta</span></h3>${estadoVacioHtml(r.motivo)}</div>`;
+      el.innerHTML = `<div class="card"><h3><i data-ic=barras></i>Evolución de tu forma <span class="beta-tag">beta</span></h3>${estadoVacioHtml(r.motivo)}</div>`;
       return;
     }
     const filasHtml = r.filas.map(f => {
@@ -14002,7 +14075,7 @@ function renderVistaUnificadaWidget() {
     }).join('');
     el.innerHTML = `
       <div class="card">
-        <h3>📊 Evolución de tu forma <span class="beta-tag">beta</span></h3>
+        <h3><i data-ic=barras></i>Evolución de tu forma <span class="beta-tag">beta</span></h3>
         <p class="hint">Tus indicadores de rendimiento en un vistazo, con tendencia reciente vs. anterior. Nada nuevo calculado aquí — es un resumen de los widgets de abajo.</p>
         ${filasHtml}
       </div>
@@ -14029,7 +14102,7 @@ function renderQueCambioWidget() {
   if (!el) return;
   el.innerHTML = `
     <div class="card">
-      <h3>🔄 Qué cambió</h3>
+      <h3><i data-ic=repetir></i>Qué cambió</h3>
       <p class="hint">Compara tu periodo reciente contra el mismo número de semanas justo anterior. No calcula nada nuevo — reordena métricas que ya ves por separado en esta pestaña, marcando solo los cambios que superan el ruido normal semana a semana.</p>
       <div class="stats-period" style="margin-top:10px;">
         <button class="stats-period-btn ${quecambioSemanasActual === 4 ? 'active' : ''}" data-semanas="4">4 semanas</button>
@@ -14123,7 +14196,7 @@ function renderComparadorMesesWidget() {
   if (meses.length < 2) {
     el.innerHTML = `
       <div class="card">
-        <h3>📆 Comparar meses</h3>
+        <h3><i data-ic=calendario></i>Comparar meses</h3>
         ${estadoVacioHtml('Necesitas sesiones registradas en al menos 2 meses distintos para comparar.')}
       </div>`;
     return;
@@ -14136,7 +14209,7 @@ function renderComparadorMesesWidget() {
 
   el.innerHTML = `
     <div class="card">
-      <h3>📆 Comparar meses</h3>
+      <h3><i data-ic=calendario></i>Comparar meses</h3>
       <p class="hint">Enfrenta dos meses de calendario cualquiera — no tienen que ser consecutivos.</p>
       <div class="carrera-inputs" style="margin-top:10px;">
         <select id="compmesSelectA">${opcionesHtml(compmesSeleccionA)}</select>
@@ -14224,7 +14297,7 @@ function renderCalibracionWidget() {
   if (!r.disponible) {
     el.innerHTML = `
       <div class="card">
-        <h3>🎯 Precisión de tus estimaciones</h3>
+        <h3><i data-ic=objetivo></i>Precisión de tus estimaciones</h3>
         ${estadoVacioHtml(r.nOtraFisica
           ? `Tus ${r.nOtraFisica} comparaciones anteriores se hicieron con otra física (${fisicaVigente().personal ? 'el CdA de libro' : 'tu CdA personal'}) y no sirven para medir el modelo actual. Vuelve a comparar salidas en Registro y el histórico se irá llenando con la física nueva.`
           : 'Todavía no tienes ninguna comparación registrada. Cuando una sesión de bici coincida con una ruta guardada (en Registro, dentro del detalle de la sesión), puedes comparar el tiempo predicho contra el real — cada comparación se guarda aquí para que veas si el modelo tiende a acertar, quedarse corto o pasarse.')}
@@ -14271,7 +14344,7 @@ function renderCalibracionWidget() {
 
   el.innerHTML = `
     <div class="card">
-      <h3>🎯 Precisión de tus estimaciones</h3>
+      <h3><i data-ic=objetivo></i>Precisión de tus estimaciones</h3>
       <p class="hint">Basado en ${r.n} ${r.n === 1 ? 'comparación' : 'comparaciones'} entre lo que el modelo predijo y lo que de verdad hiciste${r.nOtraFisica ? ` (otras ${r.nOtraFisica}, hechas con ${fisicaVigente().personal ? 'el CdA de libro' : 'tu CdA personal'}, no cuentan: medían otro modelo)` : ''}.</p>
       <div class="pmc-grid" style="margin-top:8px;">
         <div><span class="label">Sesgo medio</span><span class="val ${claseSesgo}">${r.sesgoMedioPct > 0 ? '+' : ''}${r.sesgoMedioPct}%</span></div>
@@ -14296,7 +14369,7 @@ function renderCurvaPotenciaWidget() {
   const lbl = CP_LABELS_DISCIPLINA[cpDisciplinaActual];
   el.innerHTML = `
     <div class="card">
-      <h3>${lbl.emoji} Curva de potencia <span class="beta-tag">beta</span></h3>
+      <h3><i data-ic=${cpDisciplinaActual === 'cycling' ? 'bici' : 'zapatilla'}></i>Curva de potencia <span class="beta-tag">beta</span></h3>
       <div class="stats-period">
         <button class="stats-period-btn ${cpDisciplinaActual === 'cycling' ? 'active' : ''}" data-disciplina="cycling">🚴 Bici</button>
         <button class="stats-period-btn ${cpDisciplinaActual === 'running' ? 'active' : ''}" data-disciplina="running">🏃 Running</button>
@@ -14420,7 +14493,7 @@ function renderDurabilityWidget() {
   const minMin = DURABILITY_MIN_MINUTOS[durabilityDisciplinaActual];
   el.innerHTML = `
     <div class="card">
-      <h3>🔋 Durability <span class="beta-tag">beta</span></h3>
+      <h3><i data-ic=bateria></i>Durability <span class="beta-tag">beta</span></h3>
       <p class="hint">Cuánto conservas de tu capacidad de esfuerzo corto (1 y 5 min) cuando ya llevas mucho trabajo acumulado en la propia sesión, frente a cuando empiezas fresco. Solo con sesiones ${lbl.nombrePlural} de ${minMin}+ min continuos — necesitas al menos ${DURABILITY_MIN_SESIONES} para que el widget diga algo.</p>
       <div class="stats-period">
         <button class="stats-period-btn ${durabilityDisciplinaActual === 'cycling' ? 'active' : ''}" data-disciplina="cycling">🚴 Bici</button>
@@ -14493,7 +14566,7 @@ function renderPatronMinutoWidget() {
   if (!el) return;
   el.innerHTML = `
     <div class="card">
-      <h3>⏱️ Patrón por minuto de sesión <span class="beta-tag">beta</span></h3>
+      <h3><i data-ic=crono></i>Patrón por minuto de sesión <span class="beta-tag">beta</span></h3>
       <p class="hint">Cruza todas tus sesiones de running (no hace falta que repitas ruta) para ver si a partir de un minuto concreto, de forma repetida, cambia tu cadencia o tu eficiencia (potencia/FC) — comparado con el nivel general de cada sesión, no con un estándar externo.</p>
       <button class="primary-btn" id="calcularPatronMinutoBtn" style="margin-top:6px;">Calcular</button>
       <div id="patronMinutoResultado" class="simulador-resultado"></div>
@@ -14597,7 +14670,7 @@ function renderEspejoBoton(el, sessionId) {
       const tendenciaSvg = r.tendencia ? generarSvgTendenciaEF(r.tendencia) : '';
       resEl.innerHTML = `
         <div class="desacople-card forma-card ${clase}">
-          <span class="desacople-label">🪞 Eficiencia (EF) vs. tu histórico reciente</span>
+          <span class="desacople-label"><i data-ic=espejo></i>Eficiencia (EF) vs. tu histórico reciente</span>
           <span class="desacople-valor">${r.deltaPct > 0 ? '+' : ''}${r.deltaPct}%</span>
           <span class="hint">Hoy: ${r.efHoy} ${r.unidad} · mediana de ${r.n} sesiones parecidas: ${r.efMediana} ${r.unidad}</span>
         </div>
@@ -14648,7 +14721,7 @@ function renderPruebaFijaWidget() {
   el.dataset.built = '1';
   el.innerHTML = `
     <div class="card">
-      <h3>🧪 Prueba fija mensual · ${PRUEBA_FIJA_W} W</h3>
+      <h3><i data-ic=matraz></i>Prueba fija mensual · ${PRUEBA_FIJA_W} W</h3>
       <p class="hint">Una vez al mes en el rodillo, en ERG: 10 min de calentamiento, <b>20 min fijos a ${PRUEBA_FIJA_W} W</b> y 5 min suaves. Wattly la reconoce sola. Mismos vatios cada vez → si tu pulso baja, has mejorado. Hazla con el mismo ventilador, a una cadencia fija y sin entreno duro el día anterior.</p>
       <button class="primary-btn" id="calcularPruebaFijaBtn" style="margin-top:10px;">Calcular</button>
       <div id="pruebaFijaResultado" class="simulador-resultado"></div>
@@ -14781,7 +14854,7 @@ function renderRodilloCalleWidget() {
   el.dataset.built = '1';
   el.innerHTML = `
     <div class="card">
-      <h3>🏠⛰️ Rodillo ↔ calle <span class="beta-tag">beta</span></h3>
+      <h3><i data-ic=casa></i>⛰️ Rodillo ↔ calle <span class="beta-tag">beta</span></h3>
       <p class="hint">Cuánto rindes en el rodillo frente a la calle, y los puertos que has subido en los dos sitios. Si la diferencia es clara, el estimador de puertos deja de tratar tus récords de Rouvy como si fueran de la calle.</p>
       <button class="primary-btn" id="calcularRodilloCalleBtn" style="margin-top:10px;">Calcular</button>
       <div id="rodilloCalleResultado" class="simulador-resultado"></div>
@@ -14902,7 +14975,7 @@ function renderCdAWidget() {
       </label>` : '';
   el.innerHTML = `
     <div class="card">
-      <h3>🌬️ Tu CdA real <span class="beta-tag">beta</span></h3>
+      <h3><i data-ic=viento></i>Tu CdA real <span class="beta-tag">beta</span></h3>
       <p class="hint">Tu resistencia aerodinámica (CdA) y de rodadura (Crr) medidas con tus propias salidas: potencia, velocidad, desnivel, tu peso y el viento y la temperatura reales de cada día. Cuando es fiable, sustituye a los valores de libro en el simulador de puertos y rutas.</p>
       ${selectorBici}
       <button class="primary-btn" id="calcularCdABtn" style="margin-top:10px;">${loadCdA() ? 'Recalcular' : 'Calcular'}</button>
@@ -15077,7 +15150,7 @@ function renderTsbOptimoWidget() {
   const el = document.getElementById('tsbOptimoWidget');
   if (!el) return;
   const r = calcularTsbOptimo(loadSesionesMeta());
-  const titulo = `<h3>🎯 Tu TSB óptimo para competir <span class="beta-tag">beta</span></h3>`;
+  const titulo = `<h3><i data-ic=objetivo></i>Tu TSB óptimo para competir <span class="beta-tag">beta</span></h3>`;
   const explica = `<p class="hint">Con qué frescura te salen mejor las carreras y tests, comparando cada uno con tu nivel de esas mismas semanas (no con tu mejor marca de siempre). Cuando el resultado es claro, el taper de tu carrera objetivo apunta a tu rango en vez de al de referencia (+${TSB_OBJETIVO_MIN} a +${TSB_OBJETIVO_MAX}).</p>`;
   if (!r.disponible) {
     el.innerHTML = `<div class="card">${titulo}${explica}${estadoVacioHtml(r.motivo)}</div>`;
@@ -15117,7 +15190,7 @@ function renderCalorWidget() {
   const hayGuardado = (() => { const t = loadCosteTermico(); return !!(t.running || t.cycling || loadCalorResultados().calculado); })();
   el.innerHTML = `
     <div class="card">
-      <h3>🌡️ Calor <span class="beta-tag">beta</span></h3>
+      <h3><i data-ic=termometro></i>Calor <span class="beta-tag">beta</span></h3>
       <p class="hint">Cuánto te penaliza el calor, a partir de qué temperatura, y si te vas aclimatando — con la sensación térmica real de cada sesión. Cuando tu umbral es fiable, los avisos de calor de la app pasan a usar el tuyo.</p>
       <button class="primary-btn" id="calcularCalorBtn" style="margin-top:10px;">${hayGuardado ? 'Recalcular' : 'Calcular'}</button>
       <div id="calorResultado" class="simulador-resultado"></div>
@@ -15255,12 +15328,12 @@ function renderForma() {
       ${svgPmc}
     </div>
     <div class="card">
-      <h3>🔮 Proyección de forma (próximos ${proyeccionPmc.disponible ? proyeccionPmc.diasFuturos : 21} días)</h3>
+      <h3><i data-ic=proyeccion></i>Proyección de forma (próximos ${proyeccionPmc.disponible ? proyeccionPmc.diasFuturos : 21} días)</h3>
       ${proyeccionHtml}
     </div>
     ${heatmapHtml ? `
     <div class="card">
-      <h3>📅 Carga por semanas</h3>
+      <h3><i data-ic=calendario></i>Carga por semanas</h3>
       <div class="stats-period" style="margin-bottom:8px;">
         <button class="stats-period-btn heatmap-rango-btn ${heatmapSemanasActual === 12 ? 'active' : ''}" data-semanas="12">12 semanas</button>
         <button class="stats-period-btn heatmap-rango-btn ${heatmapSemanasActual === 52 ? 'active' : ''}" data-semanas="52">Año completo</button>
@@ -15699,7 +15772,7 @@ function renderPlanCarga() {
 
   el.innerHTML = `
     <details class="tool-details plan-carga" ${(() => { try { return localStorage.getItem('wattly_plan_abierto') === '1' ? 'open' : ''; } catch (e) { return ''; } })()}>
-      <summary>📅 Plan semana a semana</summary>
+      <summary><i data-ic=calendario></i>Plan semana a semana</summary>
       <p class="hint pmc-status ${plan.alcanza ? 'up' : 'warn'}" style="margin:2px 0 8px;">${resumen}</p>
       ${plan.pasadas.length ? `<div class="plan-tabla">${plan.pasadas.map(filaPasada).join('')}</div>` : ''}
       <div class="plan-tabla">${filas}</div>
@@ -15876,7 +15949,7 @@ function renderConstruirFormaWidget() {
   if (fecha && fecha >= fechaLocalStr(new Date())) { el.innerHTML = ''; return; } // con carrera manda su plan
   const sesiones = loadSesionesMeta();
   if (!sesiones.length) { el.innerHTML = ''; return; }
-  const titulo = `<h3>📈 Construir forma <span class="beta-tag">beta</span></h3>`;
+  const titulo = `<h3><i data-ic=sube></i>Construir forma <span class="beta-tag">beta</span></h3>`;
   const plan = calcularPlanConstruccion(sesiones);
   if (!plan.disponible) { el.innerHTML = `<div class="card">${titulo}${estadoVacioHtml(plan.motivo)}</div>`; return; }
 
@@ -16607,7 +16680,7 @@ function renderPuertosVirtualesWidget() {
   el.dataset.built = '1';
   el.innerHTML = `
     <div class="card">
-      <h3>🏔️ Mis puertos (Rouvy) <span class="beta-tag">beta</span></h3>
+      <h3><i data-ic=montana></i>Mis puertos (Rouvy) <span class="beta-tag">beta</span></h3>
       <p class="hint">Cada subida de tus rutas de Rouvy, con tus intentos, tu mejor marca, la comparación kilómetro a kilómetro y un plan de ritmo. Los intentos se agrupan por la forma del perfil, así que da igual cómo se llame el fichero.</p>
       <button class="primary-btn" id="calcularPuertosVirtualesBtn" style="margin-top:10px;">Calcular</button>
       <div id="puertosVirtualesResultado" class="simulador-resultado"></div>
